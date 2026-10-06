@@ -100,7 +100,9 @@ function originalEntities(msg, originalText, finalText, channel) {
   return msg.text ? msg.entities : msg.caption_entities;
 }
 
-function editOptions(channel, msg, originalText, finalText) {
+function editOptions(channel, msg, originalText, finalText, type) {
+  const configured = formatFor(channel, type);
+  const mode = configured === 'AUTO' ? detectFormat(finalText) : configured;
   const options = {};
   const markup = buildMarkup(channel);
   if (markup) options.reply_markup = markup;
@@ -121,7 +123,7 @@ async function editOne(ctx, msg) {
 
   const originalText = contentOf(msg);
   const text = render(channel, typeOf(msg), msg);
-  const options = editOptions(channel, msg, originalText, text);
+  const { options, mode } = editOptions(channel, msg, originalText, text, type);
 
   try {
     if (msg.text) {
@@ -152,7 +154,7 @@ async function processAlbum(ctxs) {
 
   const originalText = contentOf(msg);
   const text = render(channel, 'album', msg);
-  const options = editOptions(channel, msg, originalText, text);
+  const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
 
   try {
     if (msg.photo || msg.video) {
