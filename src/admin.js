@@ -1,4 +1,4 @@
-import { ensureChannel } from './store.js';
+import { ensureChannel, saveStore } from './store.js';
 
 function allowed(ctx) {
   const ids = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -15,15 +15,26 @@ const menu = {
   ]}
 };
 
+const TYPES = [
+  ['text', '💬 TEXTO'], ['photo', '🖼️ FOTO'], ['video', '🎬 VIDEO'],
+  ['album', '🖼️ ÁLBUM'], ['link', '🔗 ENLACE'], ['forwarded', '↪️ REENVIADO']
+];
+
+const sessions = new Map();
+const key = ctx => String(ctx.from.id);
+const setSession = (ctx, data) => sessions.set(key(ctx), data);
+const getSession = ctx => sessions.get(key(ctx));
+const clearSession = ctx => sessions.delete(key(ctx));
+
 function channelMenu(c) {
-  return {
-    reply_markup: { inline_keyboard: [
-      [{ text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id }],
-      [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
-      [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
-      [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
-    ]}
-  };
+  return { reply_markup: { inline_keyboard: [
+    [{ text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id }],
+    [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
+    [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
+    [{ text: c.enabled ? '🔴 DESACTIVAR' : '🟢 ACTIVAR', callback_data: 'toggle:' + c.id }],
+    [{ text: '🗑️ ELIMINAR', callback_data: 'delete:' + c.id }],
+    [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
+  ]}};
 }
 
 async function showChannels(ctx, store, edit = false) {
@@ -33,154 +44,245 @@ async function showChannels(ctx, store, edit = false) {
   }]);
   rows.push([{ text: '➕ AGREGAR CANAL', callback_data: 'admin:addchannel' }]);
   rows.push([{ text: '🔙 VOLVER', callback_data: 'admin:home' }]);
+  const text = '📢 MIS CANALES\n\n' + (Object.keys(store.channels).length ? 'Selecciona un canal:' : 'No hay canales configurados.');
+  if (edit) await ctx.editMessageText(text, { reply_markup: { inline_keyboard: rows } });
+  else await ctx.reply(text, { reply_markup: { inline_keyboard: rows } });
+}
 
-  const text = '📢 MIS CANALES\n\n' +
-    (Object.keys(store.channels).length ? 'Selecciona un canal:' : 'No hay canales configurados.');
+function templateKeyboard(c) {
+  return { reply_markup: { inline_keyboard: [
+    ...TYPES.map(([type, label]) => [{ text: label, callback_data: 'template:' + c.id + ':' + type }]),
+    [{ text: '⚙️ FORMATO', callback_data: 'format:' + c.id }],
+    [{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]
+  ]}};
+}
 
-  if (edit) {
-    await ctx.editMessageText(text, { reply_markup: { inline_keyboard: rows } });
-  } else {
-    await ctx.reply(text, { reply_markup: { inline_keyboard: rows } });
+function buttonKeyboard(c) {
+  const rows = c.buttons.map((b, i) => [{
+    text: (b.style ? b.style.toUpperCase() + ' ' : '') + (b.icon_custom_emoji_id ? '✨ ' : '') + b.text,
+    callback_data: 'button:view:' + c.id + ':' + i
+  }]);
+  rows.push([{ text: '➕ AÑADIR BOTÓN', callback_data: 'button:add:' + c.id }]);
+  rows.push([{ text: '🧹 BORRAR TODOS', callback_data: 'button:clear:' + c.id }]);
+  rows.push([{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]);
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+async function addChannelFromId(ctx, store, rawId) {
+  const id = String(rawId).trim();
+  if (!/^-100\d{5,}$/.test(id)) return ctx.reply('❌ ID de canal no válido.\n\nEjemplo: -1001234567890');
+  try {
+    const chat = await ctx.telegram.getChat(id);
+    if (chat.type !== 'channel') return ctx.reply('❌ Ese ID no corresponde a un canal.');
+    const existed = Boolean(store.channels[id]);
+    const c = ensureChannel(store, id, chat.title || '');
+    clearSession(ctx);
+    return ctx.reply((existed ? 'ℹ️ El canal ya estaba registrado.' : '✅ Canal agregado correctamente.') + '\n\n📢 ' + (c.title || 'Canal') + '\n🆔 ' + c.id, {
+      reply_markup: { inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]] }
+    });
+  } catch (err) {
+    console.error('[ADD CHANNEL]', err.description || err.message);
+    return ctx.reply('❌ No pude acceder al canal.\n\nComprueba el ID y que el bot sea administrador del canal.');
   }
 }
 
 export function registerAdmin(bot, store) {
-  const waitingForChannel = new Set();
-
   bot.command('admin', async ctx => {
     if (!allowed(ctx)) return ctx.reply('⛔ Sin permiso.');
+    clearSession(ctx);
     return ctx.reply('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
   });
 
-  bot.action('admin:channels', async ctx => {
-    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    await showChannels(ctx, store, true);
-    await ctx.answerCbQuery();
+  bot.command('cancel', async ctx => {
+    clearSession(ctx);
+    if (allowed(ctx)) await ctx.reply('❌ Operación cancelada.');
   });
 
   bot.action('admin:home', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
     await ctx.editMessageText('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
+    await ctx.answerCbQuery();
+  });
+
+  bot.action('admin:channels', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
+    await showChannels(ctx, store, true);
     await ctx.answerCbQuery();
   });
 
   bot.action('admin:addchannel', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    waitingForChannel.add(String(ctx.from.id));
+    setSession(ctx, { action: 'addchannel' });
     await ctx.answerCbQuery();
-    await ctx.reply(
-      '➕ AGREGAR CANAL\n\n' +
-      'Agrega el bot como administrador del canal y envíame su ID.\n' +
-      'Ejemplo: -1001234567890\n\n' +
-      'Puedes cancelar con /cancel.'
-    );
-  });
-
-  bot.command('cancel', async ctx => {
-    waitingForChannel.delete(String(ctx.from.id));
-    if (allowed(ctx)) await ctx.reply('❌ Operación cancelada.');
+    await ctx.reply('➕ AGREGAR CANAL\n\nEnvíame solamente el ID del canal.\nEjemplo: -1001234567890\n\n/cancel para cancelar.');
   });
 
   bot.command('addchannel', async ctx => {
     if (!allowed(ctx)) return;
-    const id = ctx.message.text.split(/\s+/)[1];
-    if (!id) return ctx.reply('Uso: /addchannel -1001234567890');
-    await addChannelFromId(ctx, store, id, waitingForChannel);
-  });
-
-  async function addChannelFromId(ctx, store, rawId, waitingSet) {
-    const id = String(rawId).trim();
-
-    if (!/^-100\d{5,}$/.test(id)) {
-      return ctx.reply('❌ ID de canal no válido. Debe tener este formato:\n-1001234567890');
-    }
-
-    try {
-      const chat = await ctx.telegram.getChat(id);
-
-      if (!['channel'].includes(chat.type)) {
-        return ctx.reply('❌ Ese ID no corresponde a un canal de Telegram.');
-      }
-
-      const existed = Boolean(store.channels[id]);
-      const c = ensureChannel(store, id, chat.title || '');
-
-      waitingSet.delete(String(ctx.from.id));
-
-      await ctx.reply(
-        (existed ? 'ℹ️ El canal ya estaba registrado.' : '✅ Canal agregado correctamente.') +
-        '\n\n📢 ' + (c.title || 'Canal') +
-        '\n🆔 ' + c.id +
-        '\n\nYa puedes configurarlo desde /admin → CANALES.',
-        { reply_markup: { inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]] } }
-      );
-    } catch (err) {
-      console.error('[ADD CHANNEL]', err.description || err.message);
-      await ctx.reply(
-        '❌ No pude acceder a ese canal.\n\n' +
-        'Verifica que:\n' +
-        '• El ID sea correcto.\n' +
-        '• El bot esté agregado al canal.\n' +
-        '• El bot sea administrador del canal.'
-      );
-    }
-  }
-
-  bot.on('text', async ctx => {
-    if (!allowed(ctx)) return;
-    const userId = String(ctx.from.id);
-    if (!waitingForChannel.has(userId)) return;
-
-    const id = String(ctx.message.text || '').trim();
-    await addChannelFromId(ctx, store, id, waitingForChannel);
+    await addChannelFromId(ctx, store, ctx.message.text.split(/\s+/)[1] || '');
   });
 
   bot.action(/^channel:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText(
-      '📢 ' + (c.title || 'Canal') + '\n\nID: ' + c.id + '\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo'),
-      channelMenu(c)
-    );
+    await ctx.editMessageText('📢 ' + (c.title || 'Canal') + '\n\n🆔 ' + c.id + '\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo'), channelMenu(c));
     await ctx.answerCbQuery();
+  });
+
+  bot.action(/^toggle:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.enabled = !c.enabled; saveStore(store);
+    await ctx.editMessageText('📢 ' + (c.title || c.id) + '\n\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo'), channelMenu(c));
+    await ctx.answerCbQuery(c.enabled ? 'Canal activado' : 'Canal desactivado');
+  });
+
+  bot.action(/^delete:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = ctx.match[1];
+    await ctx.editMessageText('⚠️ ¿Eliminar este canal de la configuración?', { reply_markup: { inline_keyboard: [
+      [{ text: '🗑️ SÍ, ELIMINAR', callback_data: 'deleteyes:' + id }],
+      [{ text: '🔙 CANCELAR', callback_data: 'channel:' + id }]
+    ]}});
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/^deleteyes:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    delete store.channels[ctx.match[1]]; saveStore(store);
+    await showChannels(ctx, store, true);
+    await ctx.answerCbQuery('Canal eliminado');
   });
 
   bot.action(/^tpl:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText(
-      '📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nTipos: text, photo, video, album, link, forwarded\n\nUsa /settemplate TIPO TEXTO\nVariable: {contenido}',
-      { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] } }
-    );
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nSelecciona el tipo.\n\nVariables:\n{contenido}  {titulo}  {descripcion}\n{enlace}  {hashtags}  {fecha}  {canal}', templateKeyboard(c));
     await ctx.answerCbQuery();
   });
 
-  bot.command('settemplate', async ctx => {
-    if (!allowed(ctx)) return;
-    const parts = ctx.message.text.split(/\s+/);
-    const type = parts[1];
-    const template = parts.slice(2).join(' ').trim();
-    if (!['text','photo','video','album','link','forwarded'].includes(type) || !template)
-      return ctx.reply('Uso: /settemplate photo Texto de plantilla');
-    return ctx.reply('⚠️ Selecciona primero el canal desde /admin. El editor visual por canal está en la siguiente fase.');
+  bot.action(/^template:(-?\d+):(text|photo|video|album|link|forwarded)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = ctx.match[1], type = ctx.match[2], c = ensureChannel(store, id);
+    setSession(ctx, { action: 'template', channelId: id, type });
+    await ctx.answerCbQuery();
+    await ctx.reply('📝 EDITAR PLANTILLA — ' + type.toUpperCase() + '\n\nActual:\n' + c.templates[type] + '\n\nEnvíame la nueva plantilla.\n/cancel para cancelar.');
+  });
+
+  bot.action(/^format:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    await ctx.editMessageText('⚙️ FORMATO — ' + (c.title || c.id) + '\n\nActual: ' + c.parse_mode, { reply_markup: { inline_keyboard: [
+      [{ text: 'HTML', callback_data: 'formatset:' + c.id + ':HTML' }],
+      [{ text: 'MarkdownV2', callback_data: 'formatset:' + c.id + ':MarkdownV2' }],
+      [{ text: 'SIN PARSEAR / ENTITIES', callback_data: 'formatset:' + c.id + ':OFF' }],
+      [{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]
+    ]}});
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/^formatset:(-?\d+):(HTML|MarkdownV2|OFF)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]); c.parse_mode = ctx.match[2]; saveStore(store);
+    await ctx.answerCbQuery('Formato: ' + c.parse_mode);
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nFormato guardado: ' + c.parse_mode, templateKeyboard(c));
   });
 
   bot.action(/^hash:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText(' #️⃣ HASHTAGS — ' + (c.title || c.id) + '\n\n' + (c.hashtags.join(' ') || 'Sin hashtags.') + '\n\nUsa /sethashtags después de seleccionar canal.', { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] }});
+    setSession(ctx, { action: 'hashtags', channelId: c.id });
+    await ctx.editMessageText('️⃣ HASHTAGS — ' + (c.title || c.id) + '\n\nActuales:\n' + (c.hashtags.join(' ') || 'Ninguno') + '\n\nEnvíame hashtags separados por espacios.\nEjemplo: #Noticias #Telegram #Canal\n\n/cancel para cancelar.');
     await ctx.answerCbQuery();
   });
 
   bot.action(/^btn:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nEditor visual pendiente de V2.', { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] }});
+    await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nEstilos REALES de Telegram: primary (azul), success (verde), danger (rojo).\nTambién puedes usar icon_custom_emoji_id para Emoji Premium.\n\nSelecciona un botón:', buttonKeyboard(c));
     await ctx.answerCbQuery();
   });
 
-  bot.action('admin:templates', ctx => ctx.answerCbQuery('Las plantillas se administran por canal.'));
-  bot.action('admin:hashtags', ctx => ctx.answerCbQuery('Los hashtags se administran por canal.'));
-  bot.action('admin:buttons', ctx => ctx.answerCbQuery('Los botones se administran por canal.'));
-  bot.action('admin:settings', ctx => ctx.answerCbQuery('Configuración global próximamente.'));
+  bot.action(/^button:add:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    setSession(ctx, { action: 'button', channelId: ctx.match[1] });
+    await ctx.answerCbQuery();
+    await ctx.reply('➕ NUEVO BOTÓN\n\nTexto | tipo | destino | estilo | emoji_id | fila\n\ntipo: url o callback\nestilo: primary, success, danger o vacío\nemoji_id: ID del Emoji Premium o vacío\nfila: 0, 1, 2...\n\nEjemplo:\n🔥 VISITAR | url | https://t.me | primary | 5368324170671202286 | 0\n\n/cancel para cancelar.');
+  });
+
+  bot.action(/^button:view:(-?\d+):(\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]), index = Number(ctx.match[2]), b = c.buttons[index];
+    if (!b) return ctx.answerCbQuery('Botón no encontrado');
+    await ctx.editMessageText('🔘 BOTÓN\n\nTexto: ' + b.text + '\nTipo: ' + b.type + '\nDestino: ' + (b.url || b.callback_data || '') + '\nEstilo: ' + (b.style || 'default') + '\nEmoji Premium: ' + (b.icon_custom_emoji_id || 'ninguno') + '\nFila: ' + (b.row ?? 0), { reply_markup: { inline_keyboard: [
+      [{ text: '✏️ EDITAR', callback_data: 'button:edit:' + c.id + ':' + index }],
+      [{ text: '🗑️ ELIMINAR', callback_data: 'button:delete:' + c.id + ':' + index }],
+      [{ text: '🔙 BOTONES', callback_data: 'btn:' + c.id }]
+    ]}});
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/^button:edit:(-?\d+):(\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    setSession(ctx, { action: 'button', channelId: ctx.match[1], index: Number(ctx.match[2]) });
+    await ctx.answerCbQuery();
+    await ctx.reply('✏️ EDITAR BOTÓN\n\nTexto | tipo | destino | estilo | emoji_id | fila\n\nEstilos: primary, success, danger o vacío.\n/cancel para cancelar.');
+  });
+
+  bot.action(/^button:delete:(-?\d+):(\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]); c.buttons.splice(Number(ctx.match[2]), 1); saveStore(store);
+    await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id), buttonKeyboard(c)); await ctx.answerCbQuery('Botón eliminado');
+  });
+
+  bot.action(/^button:clear:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]); c.buttons = []; saveStore(store);
+    await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nNo hay botones configurados.', buttonKeyboard(c)); await ctx.answerCbQuery('Botones eliminados');
+  });
+
+  bot.action('admin:templates', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
+  bot.action('admin:hashtags', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
+  bot.action('admin:buttons', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
+  bot.action('admin:settings', ctx => allowed(ctx) ? ctx.answerCbQuery('La configuración se administra por canal.') : ctx.answerCbQuery('Sin permiso'));
+
+  bot.on('text', async ctx => {
+    if (!allowed(ctx) || ctx.message.text.startsWith('/')) return;
+    const s = getSession(ctx);
+    if (!s) return;
+
+    if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
+
+    if (s.action === 'template') {
+      const c = ensureChannel(store, s.channelId);
+      c.templates[s.type] = ctx.message.text.trim(); saveStore(store); clearSession(ctx);
+      return ctx.reply('✅ Plantilla guardada para ' + s.type + '.');
+    }
+
+    if (s.action === 'hashtags') {
+      const c = ensureChannel(store, s.channelId);
+      c.hashtags = ctx.message.text.split(/\s+/).filter(Boolean).map(tag => tag.startsWith('#') ? tag : '#' + tag.replace(/^#+/, ''));
+      saveStore(store); clearSession(ctx);
+      return ctx.reply('✅ Hashtags guardados: ' + c.hashtags.join(' '));
+    }
+
+    if (s.action === 'button') {
+      const parts = ctx.message.text.split('|').map(x => x.trim());
+      if (parts.length < 6) return ctx.reply('❌ Formato: Texto | tipo | destino | estilo | emoji_id | fila');
+      const [text, type, destination, style, emojiId, rowRaw] = parts;
+      if (!text || !['url', 'callback'].includes(type)) return ctx.reply('❌ Tipo debe ser url o callback.');
+      if (type === 'url' && !/^https?:\/\//i.test(destination)) return ctx.reply('❌ La URL debe comenzar con http:// o https://');
+      if (type === 'callback' && Buffer.byteLength(destination, 'utf8') > 64) return ctx.reply('❌ callback_data supera 64 bytes.');
+      if (style && !['primary', 'success', 'danger'].includes(style.toLowerCase())) return ctx.reply('❌ Estilo: primary, success o danger.');
+      const row = Number.isInteger(Number(rowRaw)) && Number(rowRaw) >= 0 ? Number(rowRaw) : 0;
+      const button = { text, type, ...(type === 'url' ? { url: destination } : { callback_data: destination }), ...(style ? { style: style.toLowerCase() } : {}), ...(emojiId ? { icon_custom_emoji_id: emojiId } : {}), row };
+      const c = ensureChannel(store, s.channelId);
+      if (s.index === undefined) c.buttons.push(button); else c.buttons[s.index] = button;
+      saveStore(store); clearSession(ctx);
+      return ctx.reply('✅ Botón guardado con Style de Telegram' + (emojiId ? ' + Emoji Premium.' : '.'));
+    }
+  });
 }
