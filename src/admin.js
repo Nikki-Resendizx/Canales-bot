@@ -15,7 +15,38 @@ const menu = {
   ]}
 };
 
+function channelMenu(c) {
+  return {
+    reply_markup: { inline_keyboard: [
+      [{ text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id }],
+      [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
+      [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
+      [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
+    ]}
+  };
+}
+
+async function showChannels(ctx, store, edit = false) {
+  const rows = Object.values(store.channels).map(c => [{
+    text: (c.enabled ? '🟢 ' : '🔴 ') + (c.title || c.id),
+    callback_data: 'channel:' + c.id
+  }]);
+  rows.push([{ text: '➕ AGREGAR CANAL', callback_data: 'admin:addchannel' }]);
+  rows.push([{ text: '🔙 VOLVER', callback_data: 'admin:home' }]);
+
+  const text = '📢 MIS CANALES\n\n' +
+    (Object.keys(store.channels).length ? 'Selecciona un canal:' : 'No hay canales configurados.');
+
+  if (edit) {
+    await ctx.editMessageText(text, { reply_markup: { inline_keyboard: rows } });
+  } else {
+    await ctx.reply(text, { reply_markup: { inline_keyboard: rows } });
+  }
+}
+
 export function registerAdmin(bot, store) {
+  const waitingForChannel = new Set();
+
   bot.command('admin', async ctx => {
     if (!allowed(ctx)) return ctx.reply('⛔ Sin permiso.');
     return ctx.reply('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
@@ -23,10 +54,7 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:channels', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const rows = Object.values(store.channels).map(c => [{ text: (c.enabled ? '🟢 ' : '🔴 ') + (c.title || c.id), callback_data: 'channel:' + c.id }]);
-    rows.push([{ text: '➕ AGREGAR CANAL', callback_data: 'admin:addchannel' }]);
-    rows.push([{ text: '🔙 VOLVER', callback_data: 'admin:home' }]);
-    await ctx.editMessageText('📢 MIS CANALES\n\nSelecciona un canal:', { reply_markup: { inline_keyboard: rows } });
+    await showChannels(ctx, store, true);
     await ctx.answerCbQuery();
   });
 
@@ -37,16 +65,74 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action('admin:addchannel', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    waitingForChannel.add(String(ctx.from.id));
     await ctx.answerCbQuery();
-    await ctx.reply('➕ AGREGAR CANAL\n\nAgrega el bot como administrador del canal y envíame su ID.\nEjemplo: -1001234567890');
+    await ctx.reply(
+      '➕ AGREGAR CANAL\n\n' +
+      'Agrega el bot como administrador del canal y envíame su ID.\n' +
+      'Ejemplo: -1001234567890\n\n' +
+      'Puedes cancelar con /cancel.'
+    );
+  });
+
+  bot.command('cancel', async ctx => {
+    waitingForChannel.delete(String(ctx.from.id));
+    if (allowed(ctx)) await ctx.reply('❌ Operación cancelada.');
   });
 
   bot.command('addchannel', async ctx => {
     if (!allowed(ctx)) return;
     const id = ctx.message.text.split(/\s+/)[1];
     if (!id) return ctx.reply('Uso: /addchannel -1001234567890');
-    const c = ensureChannel(store, id);
-    return ctx.reply('✅ Canal agregado: ' + c.id);
+    await addChannelFromId(ctx, store, id, waitingForChannel);
+  });
+
+  async function addChannelFromId(ctx, store, rawId, waitingSet) {
+    const id = String(rawId).trim();
+
+    if (!/^-100\d{5,}$/.test(id)) {
+      return ctx.reply('❌ ID de canal no válido. Debe tener este formato:\n-1001234567890');
+    }
+
+    try {
+      const chat = await ctx.telegram.getChat(id);
+
+      if (!['channel'].includes(chat.type)) {
+        return ctx.reply('❌ Ese ID no corresponde a un canal de Telegram.');
+      }
+
+      const existed = Boolean(store.channels[id]);
+      const c = ensureChannel(store, id, chat.title || '');
+
+      waitingSet.delete(String(ctx.from.id));
+
+      await ctx.reply(
+        (existed ? 'ℹ️ El canal ya estaba registrado.' : '✅ Canal agregado correctamente.') +
+        '\n\n📢 ' + (c.title || 'Canal') +
+        '\n🆔 ' + c.id +
+        '\n\nYa puedes configurarlo desde /admin → CANALES.',
+        { reply_markup: { inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]] } }
+      );
+    } catch (err) {
+      console.error('[ADD CHANNEL]', err.description || err.message);
+      await ctx.reply(
+        '❌ No pude acceder a ese canal.\n\n' +
+        'Verifica que:\n' +
+        '• El ID sea correcto.\n' +
+        '• El bot esté agregado al canal.\n' +
+        '• El bot sea administrador del canal.'
+      );
+    }
+  }
+
+  bot.on('text', async ctx => {
+    if (!allowed(ctx)) return;
+    const userId = String(ctx.from.id);
+    if (!waitingForChannel.has(userId)) return;
+
+    const id = String(ctx.message.text || '').trim();
+    await addChannelFromId(ctx, store, id, waitingForChannel);
   });
 
   bot.action(/^channel:(-?\d+)$/, async ctx => {
@@ -54,12 +140,7 @@ export function registerAdmin(bot, store) {
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText(
       '📢 ' + (c.title || 'Canal') + '\n\nID: ' + c.id + '\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo'),
-      { reply_markup: { inline_keyboard: [
-        [{ text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id }],
-        [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
-        [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
-        [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
-      ]}}
+      channelMenu(c)
     );
     await ctx.answerCbQuery();
   });
@@ -69,7 +150,7 @@ export function registerAdmin(bot, store) {
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText(
       '📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nTipos: text, photo, video, album, link, forwarded\n\nUsa /settemplate TIPO TEXTO\nVariable: {contenido}',
-      { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] }}
+      { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] } }
     );
     await ctx.answerCbQuery();
   });
