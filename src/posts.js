@@ -5,18 +5,28 @@ function typeOf(msg) {
   if (msg.photo) return 'photo';
   if (msg.video) return 'video';
   if (msg.forward_origin) return 'forwarded';
+
   const text = msg.text || msg.caption || '';
-  return /https?:\/\//i.test(text) ? 'link' : 'text';
+  const hasUrl = text.includes('http://') || text.includes('https://');
+  return hasUrl ? 'link' : 'text';
 }
 
 function contentOf(msg) {
-  return (msg.text || msg.caption || '').trim();
+  return String(msg.text || msg.caption || '').trim();
 }
 
 function render(channel, type, msg) {
-  let text = contentOf(msg).replace(/[ \\t]+/g, ' ').replace(/\\n{3,}/g, '\\n\\n').trim();
-  text = (channel.templates[type] || '{contenido}').replaceAll('{contenido}', text);
-  if (channel.hashtags.length) text += '\\n\\n' + channel.hashtags.join(' ');
+  let text = contentOf(msg);
+  text = text.split('\\t').join(' ').trim();
+  text = text.split('\\n\\n\\n').join('\\n\\n');
+
+  const template = channel.templates[type] || '{contenido}';
+  text = template.replaceAll('{contenido}', text);
+
+  if (channel.hashtags.length) {
+    text += '\\n\\n' + channel.hashtags.join(' ');
+  }
+
   return text.trim();
 }
 
@@ -31,6 +41,7 @@ async function process(ctx) {
 
   try {
     const markup = channel.buttons.length ? { inline_keyboard: channel.buttons } : undefined;
+
     if (msg.text) {
       await ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text, { reply_markup: markup });
     } else if (msg.photo || msg.video) {
@@ -42,20 +53,28 @@ async function process(ctx) {
 }
 
 export function registerPosts(bot, store) {
-  bot.use((ctx, next) => { ctx.store = store; return next(); });
+  bot.use((ctx, next) => {
+    ctx.store = store;
+    return next();
+  });
+
   const timers = new Map();
 
-  bot.on('channel_post', async ctx => {
+  bot.on('channel_post', async (ctx) => {
     const msg = ctx.channelPost;
+
     if (msg.media_group_id) {
       const key = String(msg.chat.id) + ':' + msg.media_group_id;
       clearTimeout(timers.get(key));
+
       timers.set(key, setTimeout(() => {
         timers.delete(key);
         process(ctx).catch(console.error);
       }, 1000));
+
       return;
     }
+
     await process(ctx);
   });
 }
