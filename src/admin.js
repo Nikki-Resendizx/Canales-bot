@@ -30,6 +30,68 @@ const FORMATS = [
   ['OFF', 'OFF']
 ];
 
+function addChannelKeyboard() {
+  return {
+    reply_markup: {
+      keyboard: [[{
+        text: '📢 SELECCIONAR CANAL',
+        style: 'primary',
+        request_chat: {
+          request_id: 1001,
+          chat_is_channel: true,
+          user_administrator_rights: {
+            can_manage_chat: true
+          },
+          bot_administrator_rights: {
+            can_manage_chat: true,
+            can_post_messages: true,
+            can_edit_messages: true,
+            can_delete_messages: true
+          },
+          request_title: true,
+          request_username: true,
+          request_photo: true
+        }
+      }]],
+      resize_keyboard: true,
+      one_time_keyboard: true
+    }
+  };
+}
+
+function removeKeyboard() {
+  return { reply_markup: { remove_keyboard: true } };
+}
+
+async function addChannelFromChat(ctx, store, chatId, shared = {}) {
+  const id = String(chatId);
+  try {
+    const chat = await ctx.telegram.getChat(id);
+    if (chat.type !== 'channel') return ctx.reply('❌ El chat seleccionado no es un canal.', removeKeyboard());
+
+    const existed = Boolean(store.channels[id]);
+    const c = ensureChannel(store, id, chat.title || shared.title || '');
+    clearSession(ctx);
+
+    return ctx.reply(
+      (existed ? 'ℹ️ El canal ya estaba registrado.' : '✅ Canal agregado automáticamente.') +
+      '\n\n📢 ' + (c.title || chat.title || 'Canal') +
+      '\n🆔 ' + c.id +
+      (chat.username ? '\n🔗 @' + chat.username : '') +
+      '\n🟢 Listo para procesar publicaciones.',
+      {
+        ...removeKeyboard(),
+        reply_markup: {
+          inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]]
+        }
+      }
+    );
+  } catch (err) {
+    console.error('[ADD CHANNEL SHARED]', err.description || err.message);
+    return ctx.reply('❌ Telegram no me permitió acceder al canal seleccionado.\n\nAsegúrate de que el bot tenga permisos de administrador para publicar y editar mensajes.', removeKeyboard());
+  }
+}
+
 const sessions = new Map();
 const key = ctx => String(ctx.from.id);
 const setSession = (ctx, data) => sessions.set(key(ctx), data);
@@ -126,7 +188,37 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     setSession(ctx, { action: 'addchannel' });
     await ctx.answerCbQuery();
-    await ctx.reply('➕ AGREGAR CANAL\n\nEnvíame solamente el ID del canal.\nEjemplo: -1001234567890\n\n/cancel para cancelar.');
+    await ctx.reply(
+      '➕ AGREGAR CANAL\n\nSelecciona directamente el canal desde Telegram. No necesitas copiar el ID.\n\nTelegram solicitará los permisos necesarios y el bot lo registrará automáticamente.',
+      addChannelKeyboard()
+    );
+  });
+
+  bot.on('message', async ctx => {
+    if (!allowed(ctx)) return;
+    const shared = ctx.message?.chat_shared;
+    if (!shared) return;
+    if (shared.request_id !== 1001) return;
+    await addChannelFromChat(ctx, store, shared.chat_id, shared);
+  });
+
+  bot.on('my_chat_member', async ctx => {
+    const update = ctx.myChatMember;
+    if (!update?.chat || update.chat.type !== 'channel') return;
+
+    const status = update.new_chat_member?.status;
+    if (!['administrator', 'member'].includes(status)) return;
+
+    try {
+      const chat = await ctx.telegram.getChat(update.chat.id);
+      if (chat.type !== 'channel') return;
+      const c = ensureChannel(store, chat.id, chat.title || '');
+      c.enabled = true;
+      saveStore(store);
+      console.log('[AUTO CHANNEL]', chat.id, chat.title || '');
+    } catch (err) {
+      console.error('[AUTO CHANNEL]', err.description || err.message);
+    }
   });
 
   bot.command('addchannel', async ctx => {
