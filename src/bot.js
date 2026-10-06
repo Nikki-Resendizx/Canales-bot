@@ -18,6 +18,6 @@ registerAdmin(bot, store);
 registerPosts(bot, store);
 
 bot.command('start', (ctx) => ctx.reply('🤖 Canales-bot\n\nUsa /admin para administrar canales y plantillas.'));
-bot.launch({ dropPendingUpdates: true }).then(() => console.log('🤖 Canales-bot iniciado.'));
+bot.launch({ dropPendingUpdates: true, allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member'] }).then(() => console.log('🤖 Canales-bot iniciado.'));
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
