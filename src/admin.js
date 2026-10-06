@@ -20,6 +20,16 @@ const TYPES = [
   ['album', '🖼️ ÁLBUM'], ['link', '🔗 ENLACE'], ['forwarded', '↪️ REENVIADO']
 ];
 
+const FORMATS = [
+  ['AUTO', '🤖 AUTOMÁTICO'],
+  ['HTML', 'HTML'],
+  ['Markdown', 'Markdown'],
+  ['MarkdownV2', 'MarkdownV2'],
+  ['rich_message', 'rich_message'],
+  ['Telegram', 'Telegram'],
+  ['OFF', 'OFF']
+];
+
 const sessions = new Map();
 const key = ctx => String(ctx.from.id);
 const setSession = (ctx, data) => sessions.set(key(ctx), data);
@@ -52,7 +62,7 @@ async function showChannels(ctx, store, edit = false) {
 function templateKeyboard(c) {
   return { reply_markup: { inline_keyboard: [
     ...TYPES.map(([type, label]) => [{ text: label, callback_data: 'template:' + c.id + ':' + type }]),
-    [{ text: '⚙️ FORMATO', callback_data: 'format:' + c.id }],
+    [{ text: '📝 FORMATO', callback_data: 'format:' + c.id }],
     [{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]
   ]}};
 }
@@ -175,20 +185,56 @@ export function registerAdmin(bot, store) {
   bot.action(/^format:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText('⚙️ FORMATO — ' + (c.title || c.id) + '\n\nActual: ' + c.parse_mode, { reply_markup: { inline_keyboard: [
-      [{ text: 'HTML', callback_data: 'formatset:' + c.id + ':HTML' }],
-      [{ text: 'MarkdownV2', callback_data: 'formatset:' + c.id + ':MarkdownV2' }],
-      [{ text: 'SIN PARSEAR / ENTITIES', callback_data: 'formatset:' + c.id + ':OFF' }],
-      [{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]
-    ]}});
+    const rows = TYPES.map(([type, label]) => [{
+      text: label + ' → ' + (c.formats?.[type] || 'AUTO'),
+      callback_data: 'formatpick:' + c.id + ':' + type
+    }]);
+    rows.push([{ text: '🤖 AUTO: detecta el formato', callback_data: 'formatinfo:' + c.id }]);
+    rows.push([{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]);
+    await ctx.editMessageText(
+      '📝 FORMATO — ' + (c.title || c.id) +
+      '\n\nCada tipo puede usar un formato diferente.' +
+      '\nAUTO detecta HTML, Markdown, MarkdownV2, rich_message o texto plano.' +
+      '\nrich_message permite contenido enriquecido avanzado y mezcla Markdown + HTML compatible.',
+      { reply_markup: { inline_keyboard: rows } }
+    );
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^formatset:(-?\d+):(HTML|MarkdownV2|OFF)$/, async ctx => {
+  bot.action(/^formatpick:(-?\d+):(text|photo|video|album|link|forwarded)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const c = ensureChannel(store, ctx.match[1]); c.parse_mode = ctx.match[2]; saveStore(store);
-    await ctx.answerCbQuery('Formato: ' + c.parse_mode);
-    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nFormato guardado: ' + c.parse_mode, templateKeyboard(c));
+    const id = ctx.match[1], type = ctx.match[2], c = ensureChannel(store, id);
+    const rows = FORMATS.map(([value, label]) => [{
+      text: (c.formats?.[type] === value ? '✅ ' : '') + label,
+      callback_data: 'formatset:' + id + ':' + type + ':' + value
+    }]);
+    rows.push([{ text: '🔙 FORMATO', callback_data: 'format:' + id }]);
+    await ctx.editMessageText(
+      '📝 FORMATO — ' + type.toUpperCase() +
+      '\n\nActual: ' + (c.formats?.[type] || 'AUTO') +
+      '\n\nElige el formato para este tipo de publicación:',
+      { reply_markup: { inline_keyboard: rows } }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = ctx.match[1], type = ctx.match[2], format = ctx.match[3], c = ensureChannel(store, id);
+    c.formats[type] = format;
+    saveStore(store);
+    await ctx.answerCbQuery('Formato: ' + format);
+    await ctx.editMessageText(
+      '📝 FORMATO — ' + type.toUpperCase() +
+      '\n\nGuardado: ' + format +
+      '\n\nPuedes usar otro formato en los demás tipos.',
+      { reply_markup: { inline_keyboard: [[{ text: '🔙 FORMATO', callback_data: 'format:' + id }]] } }
+    );
+  });
+
+  bot.action(/^formatinfo:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery('AUTO detectará el contenido');
   });
 
   bot.action(/^hash:(-?\d+)$/, async ctx => {
