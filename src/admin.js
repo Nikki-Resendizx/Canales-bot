@@ -195,7 +195,7 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     setSession(ctx, { action: 'hashtags', channelId: c.id });
-    await ctx.editMessageText('️⃣ HASHTAGS — ' + (c.title || c.id) + '\n\nActuales:\n' + (c.hashtags.join(' ') || 'Ninguno') + '\n\nEnvíame hashtags separados por espacios.\nEjemplo: #Noticias #Telegram #Canal\n\n/cancel para cancelar.');
+    await ctx.editMessageText('#️⃣ HASHTAGS — ' + (c.title || c.id) + '\n\nActuales:\n' + (c.hashtags.join(' ') || 'Ninguno') + '\n\nEnvíame hashtags separados por espacios.\nEjemplo: #Noticias #Telegram #Canal\n\n/cancel para cancelar.');
     await ctx.answerCbQuery();
   });
 
