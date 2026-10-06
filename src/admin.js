@@ -49,7 +49,7 @@ export function registerAdmin(bot, store) {
     return ctx.reply('✅ Canal agregado: ' + c.id);
   });
 
-  bot.action(/^channel:(-?\\d+)$/, async ctx => {
+  bot.action(/^channel:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText(
@@ -64,7 +64,7 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^tpl:(-?\\d+)$/, async ctx => {
+  bot.action(/^tpl:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText(
@@ -84,14 +84,14 @@ export function registerAdmin(bot, store) {
     return ctx.reply('⚠️ Selecciona primero el canal desde /admin. El editor visual por canal está en la siguiente fase.');
   });
 
-  bot.action(/^hash:(-?\\d+)$/, async ctx => {
+  bot.action(/^hash:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText(' #️⃣ HASHTAGS — ' + (c.title || c.id) + '\n\n' + (c.hashtags.join(' ') || 'Sin hashtags.') + '\n\nUsa /sethashtags después de seleccionar canal.', { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] }});
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^btn:(-?\\d+)$/, async ctx => {
+  bot.action(/^btn:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nEditor visual pendiente de V2.', { reply_markup: { inline_keyboard: [[{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]] }});
