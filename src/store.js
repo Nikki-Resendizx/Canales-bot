@@ -17,6 +17,9 @@ const DATA_FILE = path.join(DATA_DIR, 'channels.json');
 function emptyStore() {
   return {
     channels: {},
+    publications: {},
+    purchases: {},
+    stats: { processed: 0, errors: 0, payments: 0, stars: 0 },
     global: {
       templates: { ...DEFAULT },
       hashtags: [],
@@ -51,12 +54,15 @@ export function createStore() {
       formats: { ...base.global.formats, ...(parsed.global?.formats || {}) }
     };
     const channels = parsed.channels || {};
+    const publications = parsed.publications || {};
+    const purchases = parsed.purchases || {};
+    const stats = { ...base.stats, ...(parsed.stats || {}) };
 
     for (const key of Object.keys(channels)) {
       channels[key] = normalizeChannel(channels[key], global);
     }
 
-    return { channels, global };
+    return { channels, publications, purchases, stats, global };
   } catch (err) {
     console.error('[STORE] No se pudo cargar data/channels.json:', err.message);
     return emptyStore();
