@@ -6,7 +6,7 @@ function typeOf(msg) {
   if (msg.video) return 'video';
   if (msg.forward_origin) return 'forwarded';
   const text = msg.text || msg.caption || '';
-  return /https?:\\/\\//i.test(text) ? 'link' : 'text';
+  return /https?:\/\//i.test(text) ? 'link' : 'text';
 }
 
 function contentOf(msg) {
