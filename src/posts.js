@@ -17,14 +17,14 @@ function contentOf(msg) {
 
 function render(channel, type, msg) {
   let text = contentOf(msg);
-  text = text.split('\\t').join(' ').trim();
-  text = text.split('\\n\\n\\n').join('\\n\\n');
+  text = text.split('\t').join(' ').trim();
+  text = text.split('\n\n\n').join('\n\n');
 
   const template = channel.templates[type] || '{contenido}';
   text = template.replaceAll('{contenido}', text);
 
   if (channel.hashtags.length) {
-    text += '\\n\\n' + channel.hashtags.join(' ');
+    text += '\n\n' + channel.hashtags.join(' ');
   }
 
   return text.trim();
