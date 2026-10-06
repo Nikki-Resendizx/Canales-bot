@@ -11,6 +11,15 @@ const menu = {
     [{ text: '📝 PLANTILLAS', callback_data: 'admin:templates' }],
     [{ text: '#️⃣ HASHTAGS', callback_data: 'admin:hashtags' }],
     [{ text: '🔘 BOTONES', callback_data: 'admin:buttons' }],
+    [{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }],
+    [{ text: '⭐ PREMIUM / ESTRELLAS', callback_data: 'admin:premium' }],
+    [{ text: '📊 ESTADÍSTICAS', callback_data: 'admin:stats' }],
+    [{ text: '🧩 REGLAS AUTOMÁTICAS', callback_data: 'admin:rules' }],
+    [{ text: '🧪 MODO PRUEBA', callback_data: 'admin:test' }],
+    [{ text: '👥 ADMINISTRADORES', callback_data: 'admin:admins' }],
+    [{ text: '📋 HISTORIAL', callback_data: 'admin:history' }],
+    [{ text: '🚨 ALERTAS', callback_data: 'admin:alerts' }],
+    [{ text: '💾 BACKUPS', callback_data: 'admin:backup' }],
     [{ text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }]
   ]}
 };
@@ -35,7 +44,6 @@ function addChannelKeyboard() {
     reply_markup: {
       keyboard: [[{
         text: '📢 SELECCIONAR CANAL',
-        style: 'primary',
         request_chat: {
           request_id: 1001,
           chat_is_channel: true,
@@ -380,6 +388,64 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]); c.buttons = []; saveStore(store);
     await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nNo hay botones configurados.', buttonKeyboard(c)); await ctx.answerCbQuery('Botones eliminados');
+  });
+
+  bot.action('admin:publish', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery();
+    await ctx.reply('📝 CREAR PUBLICACIÓN\n\nUsa /publish para crear una publicación gratuita o una publicación con cobro en ⭐ Telegram Stars.');
+  });
+
+  bot.action('admin:premium', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const total = Object.values(store.publications || {}).filter(p => p.mode === 'paid').length;
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('⭐ PREMIUM / ESTRELLAS\n\nPublicaciones premium: ' + total + '\n⭐ Stars recibidas: ' + Number(store.stats?.stars || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n\nPara crear una venta usa /publish.');
+  });
+
+  bot.action('admin:stats', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const channels = Object.keys(store.channels || {}).length;
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Canales: ' + channels + '\n📝 Publicaciones creadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:rules', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('🧩 REGLAS AUTOMÁTICAS\n\nPor canal se pueden controlar plantillas, hashtags, formatos, botones y normalización.\n\nLa base está preparada para ampliar reglas sin mezclar configuraciones entre canales.', { reply_markup: { inline_keyboard: [[{ text: '📢 CANALES', callback_data: 'admin:channels' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:test', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('🧪 MODO PRUEBA\n\nUsa /publish para crear publicaciones. La siguiente ampliación puede enviar una vista previa al administrador antes de publicar.', { reply_markup: { inline_keyboard: [[{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:admins', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const ids = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('👥 ADMINISTRADORES\n\n' + (ids.length ? ids.map(id => '• ' + id).join('\n') : 'No hay ADMIN_IDS configurados.'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:history', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const items = Object.values(store.publications || {}).slice(-10).reverse();
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('📋 HISTORIAL\n\n' + (items.length ? items.map(p => '• ' + p.id + ' — ' + (p.mode === 'paid' ? '⭐ PREMIUM' : '🆓 GRATUITA') + ' — ' + p.status).join('\n') : 'Sin publicaciones registradas.'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:alerts', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('🚨 ALERTAS\n\nEl sistema registra errores de publicación y pagos en los logs del bot.\n\nPróxima fase: avisos directos al administrador cuando un canal pierda permisos.', { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:backup', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await ctx.answerCbQuery();
+    await ctx.reply('💾 BACKUP\n\nLa configuración se guarda en data/channels.json. Para producción en hosting efímero conviene añadir un almacenamiento persistente antes de depender del backup local.', { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:templates', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
