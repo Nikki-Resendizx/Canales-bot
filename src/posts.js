@@ -18,7 +18,10 @@ function contentOf(msg) {
 function render(channel, type, msg) {
   let text = contentOf(msg);
   text = text.split('\t').join(' ').trim();
-  text = text.split('\n\n\n').join('\n\n');
+
+  while (text.includes('\n\n\n')) {
+    text = text.replaceAll('\n\n\n', '\n\n');
+  }
 
   const template = channel.templates[type] || '{contenido}';
   text = template.replaceAll('{contenido}', text);
@@ -30,25 +33,74 @@ function render(channel, type, msg) {
   return text.trim();
 }
 
-async function process(ctx) {
-  const msg = ctx.channelPost;
+async function editOne(ctx, msg) {
   const channel = ensureChannel(ctx.store, msg.chat.id, msg.chat.title);
   if (!channel.enabled) return;
 
   const type = typeOf(msg);
   const text = render(channel, type, msg);
-  if (!text) return;
 
   try {
-    const markup = channel.buttons.length ? { inline_keyboard: channel.buttons } : undefined;
+    const markup = channel.buttons.length
+      ? { inline_keyboard: channel.buttons }
+      : undefined;
 
     if (msg.text) {
-      await ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text, { reply_markup: markup });
-    } else if (msg.photo || msg.video) {
-      await ctx.telegram.editMessageCaption(msg.chat.id, msg.message_id, undefined, text, { reply_markup: markup });
+      if (!text) return;
+      await ctx.telegram.editMessageText(
+        msg.chat.id,
+        msg.message_id,
+        undefined,
+        text,
+        { reply_markup: markup }
+      );
+      return;
+    }
+
+    if (msg.photo || msg.video) {
+      if (!text && !markup) return;
+      await ctx.telegram.editMessageCaption(
+        msg.chat.id,
+        msg.message_id,
+        undefined,
+        text || '',
+        { reply_markup: markup }
+      );
     }
   } catch (err) {
     console.error('[EDIT]', err.description || err.message);
+  }
+}
+
+async function processAlbum(ctxs) {
+  if (!ctxs.length) return;
+
+  const first = ctxs[0].channelPost;
+  const captioned = ctxs.find((ctx) => contentOf(ctx.channelPost));
+  const target = captioned || ctxs[0];
+
+  const channel = ensureChannel(ctxs[0].store, first.chat.id, first.chat.title);
+  if (!channel.enabled) return;
+
+  const msg = target.channelPost;
+  const text = render(channel, 'album', msg);
+
+  try {
+    const markup = channel.buttons.length
+      ? { inline_keyboard: channel.buttons }
+      : undefined;
+
+    if (msg.photo || msg.video) {
+      await ctxs[0].telegram.editMessageCaption(
+        msg.chat.id,
+        msg.message_id,
+        undefined,
+        text || '',
+        { reply_markup: markup }
+      );
+    }
+  } catch (err) {
+    console.error('[ALBUM EDIT]', err.description || err.message);
   }
 }
 
@@ -58,23 +110,29 @@ export function registerPosts(bot, store) {
     return next();
   });
 
-  const timers = new Map();
+  const albums = new Map();
 
   bot.on('channel_post', async (ctx) => {
     const msg = ctx.channelPost;
 
     if (msg.media_group_id) {
       const key = String(msg.chat.id) + ':' + msg.media_group_id;
-      clearTimeout(timers.get(key));
+      const current = albums.get(key) || [];
+      current.push(ctx);
+      albums.set(key, current);
 
-      timers.set(key, setTimeout(() => {
-        timers.delete(key);
-        process(ctx).catch(console.error);
-      }, 1000));
+      clearTimeout(current.timer);
 
+      const timer = setTimeout(() => {
+        const batch = albums.get(key);
+        albums.delete(key);
+        if (batch) processAlbum(batch).catch(console.error);
+      }, 1200);
+
+      current.timer = timer;
       return;
     }
 
-    await process(ctx);
+    await editOne(ctx, msg);
   });
 }
