@@ -21,7 +21,7 @@ function emptyStore() {
       templates: { ...DEFAULT },
       hashtags: [],
       buttons: [],
-      parse_mode: 'HTML',
+      formats: Object.fromEntries(Object.keys(DEFAULT).map(type => [type, 'AUTO'])),
       normalize: true
     }
   };
@@ -31,7 +31,9 @@ function normalizeChannel(channel, global) {
   channel.templates = { ...global.templates, ...(channel.templates || {}) };
   channel.hashtags = Array.isArray(channel.hashtags) ? channel.hashtags : [];
   channel.buttons = Array.isArray(channel.buttons) ? channel.buttons : [];
-  channel.parse_mode = channel.parse_mode || global.parse_mode || 'HTML';
+  const legacy = channel.parse_mode && ['HTML', 'Markdown', 'MarkdownV2', 'OFF'].includes(channel.parse_mode) ? channel.parse_mode : null;
+  channel.formats = { ...(global.formats || {}), ...(channel.formats || {}) };
+  for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
   channel.normalize = channel.normalize !== false;
   if (typeof channel.enabled !== 'boolean') channel.enabled = true;
   return channel;
@@ -45,7 +47,8 @@ export function createStore() {
     const global = {
       ...base.global,
       ...(parsed.global || {}),
-      templates: { ...DEFAULT, ...(parsed.global?.templates || {}) }
+      templates: { ...DEFAULT, ...(parsed.global?.templates || {}) },
+      formats: { ...base.global.formats, ...(parsed.global?.formats || {}) }
     };
     const channels = parsed.channels || {};
 
@@ -83,7 +86,7 @@ export function ensureChannel(store, id, title = '') {
       templates: { ...store.global.templates },
       hashtags: [],
       buttons: [],
-      parse_mode: store.global.parse_mode,
+      formats: { ...store.global.formats },
       normalize: store.global.normalize
     }, store.global);
     changed = true;
