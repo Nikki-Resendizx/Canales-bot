@@ -43,7 +43,7 @@ export function registerAdmin(bot, store) {
 
   bot.command('addchannel', async ctx => {
     if (!allowed(ctx)) return;
-    const id = ctx.message.text.split(/\\s+/)[1];
+    const id = ctx.message.text.split(/\s+/)[1];
     if (!id) return ctx.reply('Uso: /addchannel -1001234567890');
     const c = ensureChannel(store, id);
     return ctx.reply('✅ Canal agregado: ' + c.id);
@@ -76,7 +76,7 @@ export function registerAdmin(bot, store) {
 
   bot.command('settemplate', async ctx => {
     if (!allowed(ctx)) return;
-    const parts = ctx.message.text.split(/\\s+/);
+    const parts = ctx.message.text.split(/\s+/);
     const type = parts[1];
     const template = parts.slice(2).join(' ').trim();
     if (!['text','photo','video','album','link','forwarded'].includes(type) || !template)
