@@ -3,7 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "main": "src/bot.js",
-  "scripts": {"start": "node src/bot.js"},
-  "engines": {"node": ">=20"},
-  "dependencies": {"telegraf": "^4.16.3", "dotenv": "^16.4.7"}
+  "scripts": {
+    "start": "node src/bot.js",
+    "check": "node --check src/bot.js && node --check src/store.js && node --check src/admin.js && node --check src/posts.js && node --check src/publications.js && node --check src/payments.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "telegraf": "^4.16.3",
+    "dotenv": "^16.4.7"
+  }
 }
