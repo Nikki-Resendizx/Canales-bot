@@ -172,9 +172,10 @@ export function registerAdmin(bot, store) {
     return ctx.reply('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
   });
 
-  bot.command('cancel', async ctx => {
+  bot.command('cancel', async (ctx, next) => {
     clearSession(ctx);
     if (allowed(ctx)) await ctx.reply('❌ Operación cancelada.');
+    return next();
   });
 
   bot.action('admin:home', async ctx => {
