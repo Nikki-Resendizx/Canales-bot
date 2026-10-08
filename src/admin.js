@@ -112,6 +112,7 @@ function channelMenu(c) {
     [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
     [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
     [{ text: c.enabled ? '🔴 DESACTIVAR' : '🟢 ACTIVAR', callback_data: 'toggle:' + c.id }],
+    [{ text: c.testMode ? '🧪 PRUEBA: ACTIVADA' : '🧪 ACTIVAR MODO PRUEBA', callback_data: 'testmode:' + c.id }],
     [{ text: '🗑️ ELIMINAR', callback_data: 'delete:' + c.id }],
     [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
   ]}};
