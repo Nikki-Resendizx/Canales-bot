@@ -448,7 +448,18 @@ export function registerAdmin(bot, store) {
   bot.action('admin:backup', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     await ctx.answerCbQuery();
-    await ctx.reply('💾 BACKUP\n\nLa configuración se guarda en data/channels.json. Para producción en hosting efímero conviene añadir un almacenamiento persistente antes de depender del backup local.', { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    try {
+      const payload = JSON.stringify(store, null, 2);
+      await ctx.replyWithDocument({
+        source: Buffer.from(payload, 'utf8'),
+        filename: 'canales-bot-backup.json'
+      }, {
+        caption: '💾 BACKUP DE CANALES-BOT\n\nGuarda este archivo fuera del hosting para poder restaurar tu configuración.'
+      });
+    } catch (err) {
+      console.error('[BACKUP]', err.description || err.message);
+      await ctx.reply('❌ No pude generar el backup: ' + (err.description || err.message));
+    }
   });
 
   bot.action('admin:templates', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
