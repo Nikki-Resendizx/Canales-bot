@@ -62,6 +62,10 @@ function hasHtml(text) {
   return /<\/?(?:b|strong|i|em|u|ins|s|strike|del|tg-spoiler|span|a|code|pre|tg-emoji|tg-time|details|blockquote|mark|sub|sup)(?:\s[^>]*)?>/i.test(text);
 }
 
+function hasRichMarkdown(text) {
+  return /(^|\n)#{1,6}\s+|\*\*|==[^=]+==|!\[[^\]]*\]\(|<tg-|<details\b|<tg-button-row\b|\|.+\|/i.test(text);
+}
+
 function hasMarkdownV2(text) {
   // Detect only markers that distinguish MarkdownV2 from legacy Markdown.
   // Simple *bold*, _italic_ and [links](url) remain legacy Markdown in AUTO mode.
@@ -75,6 +79,7 @@ function hasLegacyMarkdown(text) {
 function detectFormat(text) {
   const value = String(text || '');
 
+  if (hasRichMarkdown(value)) return 'rich_message';
   if (hasHtml(value)) return 'HTML';
   if (hasMarkdownV2(value)) return 'MarkdownV2';
   if (hasLegacyMarkdown(value)) return 'Markdown';
