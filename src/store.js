@@ -39,6 +39,7 @@ function normalizeChannel(channel, global) {
   for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
   channel.normalize = channel.normalize !== false;
   channel.testMode = channel.testMode === true;
+  channel.testMode = channel.testMode === true;
   if (typeof channel.enabled !== 'boolean') channel.enabled = true;
   return channel;
 }
