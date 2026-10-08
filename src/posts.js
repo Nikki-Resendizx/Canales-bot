@@ -1,4 +1,4 @@
-import { ensureChannel } from './store.js';
+import { ensureChannel, saveStore } from './store.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
 const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
@@ -173,7 +173,7 @@ async function applyEdit(ctx, msg, text, options) {
   return null;
 }
 
-async function editOne(ctx, msg) {
+async function editOne(ctx, msg, store) {
   const channel = ensureChannel(ctx.store, msg.chat.id, msg.chat.title);
   if (!channel.enabled) return;
 
@@ -186,14 +186,16 @@ async function editOne(ctx, msg) {
     if (!text && !options.reply_markup && !options.rich_message) return;
     await applyEdit(ctx, msg, text, options);
     store.stats.processed += 1;
+    saveStore(store);
     console.log('[EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
   } catch (err) {
     store.stats.errors += 1;
+    saveStore(store);
     console.error('[EDIT]', err.description || err.message);
   }
 }
 
-async function processAlbum(ctxs) {
+async function processAlbum(ctxs, store) {
   if (!ctxs.length) return;
 
   const first = ctxs[0].channelPost;
@@ -212,10 +214,12 @@ async function processAlbum(ctxs) {
     if (msg.photo || msg.video) {
       await applyEdit(ctxs[0], msg, text, options);
       store.stats.processed += 1;
+      saveStore(store);
       console.log('[ALBUM EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
     }
   } catch (err) {
     store.stats.errors += 1;
+    saveStore(store);
     console.error('[ALBUM EDIT]', err.description || err.message);
   }
 }
@@ -253,11 +257,11 @@ export function registerPosts(bot, store) {
       current.timer = setTimeout(() => {
         const batch = albums.get(key);
         albums.delete(key);
-        if (batch) processAlbum(batch).catch(console.error);
+        if (batch) processAlbum(batch, store).catch(console.error);
       }, 1200);
       return;
     }
 
-    await editOne(ctx, msg);
+    await editOne(ctx, msg, store);
   });
 }
