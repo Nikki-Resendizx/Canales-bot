@@ -22,6 +22,11 @@ registerPayments(bot, store);
 registerPublications(bot, store);
 
 bot.command('start', (ctx) => ctx.reply('🤖 Canales-bot\n\nUsa /admin para administrar canales y plantillas.'));
-bot.launch({ dropPendingUpdates: true, allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'pre_checkout_query'] }).then(() => console.log('🤖 Canales-bot iniciado.'));
+bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'pre_checkout_query'] })
+  .then(() => console.log('🤖 Canales-bot iniciado.'))
+  .catch(err => {
+    console.error('[LAUNCH ERROR]', err.description || err.message);
+    process.exitCode = 1;
+  });
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
