@@ -34,7 +34,6 @@ const FORMATS = [
   ['HTML', 'HTML'],
   ['Markdown', 'Markdown'],
   ['MarkdownV2', 'MarkdownV2'],
-  ['rich_message', 'rich_message'],
   ['Telegram', 'Telegram'],
   ['OFF', 'OFF']
 ];
@@ -294,8 +293,8 @@ export function registerAdmin(bot, store) {
     await ctx.editMessageText(
       '📝 FORMATO — ' + (c.title || c.id) +
       '\n\nCada tipo puede usar un formato diferente.' +
-      '\nAUTO detecta HTML, Markdown, MarkdownV2, rich_message o texto plano.' +
-      '\nrich_message permite contenido enriquecido avanzado y mezcla Markdown + HTML compatible.',
+      '\nAUTO detecta HTML, Markdown, MarkdownV2 o texto plano.' +
+      '',
       { reply_markup: { inline_keyboard: rows } }
     );
     await ctx.answerCbQuery();
