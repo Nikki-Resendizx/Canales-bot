@@ -36,7 +36,7 @@ function normalizeChannel(channel, global) {
   channel.buttons = Array.isArray(channel.buttons) ? channel.buttons : [];
   const legacy = channel.parse_mode && ['HTML', 'Markdown', 'MarkdownV2', 'OFF'].includes(channel.parse_mode) ? channel.parse_mode : null;
   channel.formats = { ...(global.formats || {}), ...(channel.formats || {}) };
-  for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
+  for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
   channel.normalize = channel.normalize !== false;
   if (typeof channel.enabled !== 'boolean') channel.enabled = true;
   return channel;
