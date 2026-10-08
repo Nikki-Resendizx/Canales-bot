@@ -34,6 +34,7 @@ const FORMATS = [
   ['HTML', 'HTML'],
   ['Markdown', 'Markdown'],
   ['MarkdownV2', 'MarkdownV2'],
+  ['rich_message', '✨ RICH MESSAGE'],
   ['Telegram', 'Telegram'],
   ['OFF', 'OFF']
 ];
@@ -293,7 +294,7 @@ export function registerAdmin(bot, store) {
     await ctx.editMessageText(
       '📝 FORMATO — ' + (c.title || c.id) +
       '\n\nCada tipo puede usar un formato diferente.' +
-      '\nAUTO detecta HTML, Markdown, MarkdownV2 o texto plano.' +
+      '\nAUTO detecta Rich Message, HTML, Markdown, MarkdownV2 o texto plano.' +
       '',
       { reply_markup: { inline_keyboard: rows } }
     );
@@ -317,7 +318,7 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|Telegram|OFF)$/, async ctx => {
+  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], format = ctx.match[3], c = ensureChannel(store, id);
     c.formats[type] = format;
