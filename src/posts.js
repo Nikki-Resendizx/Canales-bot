@@ -63,7 +63,9 @@ function hasHtml(text) {
 }
 
 function hasMarkdownV2(text) {
-  return /(^|[^\\])(?:\*[^*\n]+\*|_[^_\n]+_|__[^_\n]+__|~[^~\n]+~|\|\|[^|\n]+\|\||\[[^\]]+\]\([^\n)]+\)|\x60\x60\x60)/.test(text);
+  // Detect only markers that distinguish MarkdownV2 from legacy Markdown.
+  // Simple *bold*, _italic_ and [links](url) remain legacy Markdown in AUTO mode.
+  return /(^|[^\\])(?:__[^_\n]+__|~[^~\n]+~|\|\|[^|\n]+\|\||\x60\x60\x60|\\\\[.!#$%&()+\-=<>@\[\]{}])/m.test(text);
 }
 
 function hasLegacyMarkdown(text) {
