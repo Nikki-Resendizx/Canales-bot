@@ -1,7 +1,7 @@
 import { ensureChannel, saveStore } from './store.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
-const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'Telegram', 'OFF'];
+const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
 
 function typeOf(msg) {
   if (msg.media_group_id) return 'album';
@@ -133,12 +133,25 @@ function editOptions(channel, msg, originalText, finalText, type) {
   } else if (mode === 'Telegram') {
     const entities = originalEntities(msg, originalText, finalText);
     if (entities) options.entities = entities;
+  } else if (mode === 'rich_message' && msg.text) {
+    // RichMessage is supported by editMessageText, not editMessageCaption.
+    options.rich_message = { markdown: finalText };
   }
 
   return { options, mode };
 }
 
 async function applyEdit(ctx, msg, text, options) {
+  if (options.rich_message && msg.text) {
+    const payload = {
+      chat_id: msg.chat.id,
+      message_id: msg.message_id,
+      rich_message: options.rich_message
+    };
+    if (options.reply_markup) payload.reply_markup = options.reply_markup;
+    return ctx.telegram.callApi('editMessageText', payload);
+  }
+
   if (msg.text) {
     return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || '', options);
   }
@@ -160,7 +173,7 @@ async function editOne(ctx, msg, store) {
   const { options, mode } = editOptions(channel, msg, originalText, text, type);
 
   try {
-    if (!text && !options.reply_markup) return;
+    if (!text && !options.reply_markup && !options.rich_message) return;
     await applyEdit(ctx, msg, text, options);
     store.stats.processed += 1;
     saveStore(store);
