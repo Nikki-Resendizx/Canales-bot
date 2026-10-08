@@ -423,7 +423,7 @@ export function registerAdmin(bot, store) {
   bot.action('admin:test', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     await ctx.answerCbQuery();
-    await ctx.editMessageText('🧪 MODO PRUEBA\n\nUsa /publish para crear publicaciones. La siguiente ampliación puede enviar una vista previa al administrador antes de publicar.', { reply_markup: { inline_keyboard: [[{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    await ctx.editMessageText('🧪 MODO PRUEBA\n\nActiva MODO PRUEBA dentro de cada canal. El bot enviará una vista previa a los administradores sin modificar la publicación original.', { reply_markup: { inline_keyboard: [[{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:admins', async ctx => {
