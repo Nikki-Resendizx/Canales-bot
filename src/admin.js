@@ -321,6 +321,9 @@ export function registerAdmin(bot, store) {
   bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], format = ctx.match[3], c = ensureChannel(store, id);
+    if (format === 'rich_message' && ['photo', 'video', 'album'].includes(type)) {
+      return ctx.answerCbQuery('Rich Message solo se puede aplicar a mensajes de texto.');
+    }
     c.formats[type] = format;
     saveStore(store);
     await ctx.answerCbQuery('Formato: ' + format);
