@@ -317,7 +317,7 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
+  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|Telegram|OFF)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], format = ctx.match[3], c = ensureChannel(store, id);
     c.formats[type] = format;
