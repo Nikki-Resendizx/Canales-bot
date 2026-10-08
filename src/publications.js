@@ -51,10 +51,10 @@ export function registerPublications(bot, store) {
       : '📝 CONTENIDO\n\nEnvíame el mensaje, foto o video que quieres publicar.\n\n/cancel para cancelar.');
   });
 
-  bot.on('message', async ctx => {
-    if (!admin(ctx)) return;
+  bot.on('message', async (ctx, next) => {
+    if (!admin(ctx)) return next();
     const s = sessions.get(key(ctx));
-    if (!s || s.step !== 'price') return;
+    if (!s || s.step !== 'price') return next();
     const price = Number(ctx.message.text);
     if (!Number.isInteger(price) || price <= 0) return ctx.reply('❌ El precio debe ser un número entero de Stars mayor que 0.');
     s.priceStars = price;
@@ -63,10 +63,10 @@ export function registerPublications(bot, store) {
     await ctx.reply('📝 CONTENIDO PREMIUM\n\nEnvíame ahora el mensaje, foto o video que quieres vender.\n\nEl mensaje recibido quedará como contenido privado y no se publicará directamente.\n\n/cancel para cancelar.');
   });
 
-  bot.on('message', async ctx => {
-    if (!admin(ctx)) return;
+  bot.on('message', async (ctx, next) => {
+    if (!admin(ctx)) return next();
     const s = sessions.get(key(ctx));
-    if (!s || s.step !== 'content') return;
+    if (!s || s.step !== 'content') return next();
     if (!ctx.message.message_id) return;
 
     const c = ensureChannel(store, s.channelId);
