@@ -66,9 +66,18 @@ export function registerPayments(bot, store) {
     if (!admins.includes(String(ctx.from?.id))) return;
     const chargeId = ctx.message.text.split(/\s+/)[1];
     if (!chargeId) return ctx.reply('Uso: /refund <telegram_payment_charge_id>');
+    const purchase = store.purchases[chargeId];
+    if (!purchase) return ctx.reply('❌ No encuentro una compra registrada con ese ID.');
+    if (purchase.refundedAt) return ctx.reply('ℹ️ Esta compra ya figura como reembolsada.');
     try {
-      await ctx.telegram.callApi('refundStarPayment', { user_id: ctx.from.id, telegram_payment_charge_id: chargeId });
-      await ctx.reply('✅ Reembolso solicitado.');
+      await ctx.telegram.callApi('refundStarPayment', {
+        user_id: purchase.userId,
+        telegram_payment_charge_id: chargeId
+      });
+      purchase.refundedAt = new Date().toISOString();
+      store.stats.stars = Math.max(0, Number(store.stats.stars || 0) - Number(purchase.stars || 0));
+      saveStore(store);
+      await ctx.reply('✅ Reembolso procesado para el usuario ' + purchase.userId + '.');
     } catch (err) {
       await ctx.reply('❌ No se pudo emitir el reembolso: ' + (err.description || err.message));
     }
