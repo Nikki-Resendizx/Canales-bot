@@ -84,6 +84,11 @@ export function registerPublications(bot, store) {
     };
 
     try {
+      // Save the order before the invoice becomes visible to buyers.
+      publication.status = 'published';
+      store.publications[publicationId] = publication;
+      saveStore(store);
+
       let sent;
       if (s.mode === 'paid') {
         sent = await ctx.telegram.callApi('sendInvoice', {
@@ -114,6 +119,9 @@ export function registerPublications(bot, store) {
         '\n🆔 ' + publicationId
       );
     } catch (err) {
+      delete store.publications[publicationId];
+      store.stats.errors += 1;
+      saveStore(store);
       console.error('[PUBLISH]', err.description || err.message);
       await ctx.reply('❌ No pude publicar: ' + (err.description || err.message));
     }
