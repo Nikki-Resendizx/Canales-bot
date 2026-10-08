@@ -168,6 +168,23 @@ async function applyEdit(ctx, msg, text, options) {
   return null;
 }
 
+async function sendTestPreview(ctx, store, msg, type, text) {
+  const admins = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
+  const preview = '🧪 VISTA PREVIA — MODO PRUEBA\\n\\n📢 Canal: ' + (msg.chat?.title || msg.chat?.id) +
+    '\\n🆔 Mensaje: ' + msg.message_id +
+    '\\n📦 Tipo: ' + type.toUpperCase() +
+    '\\n\\n' + (text || '[Sin texto]');
+  for (const adminId of admins) {
+    try {
+      await ctx.telegram.sendMessage(adminId, preview);
+    } catch (err) {
+      console.error('[TEST PREVIEW]', adminId, err.description || err.message);
+    }
+  }
+  store.stats.processed += 1;
+  saveStore(store);
+}
+
 async function editOne(ctx, msg, store) {
   const channel = ensureChannel(ctx.store, msg.chat.id, msg.chat.title);
   if (!channel.enabled) return;
@@ -175,6 +192,10 @@ async function editOne(ctx, msg, store) {
   const originalText = contentOf(msg);
   const type = typeOf(msg);
   const text = render(channel, type, msg);
+  if (channel.testMode) {
+    await sendTestPreview(ctx, store, msg, type, text);
+    return;
+  }
   const { options, mode } = editOptions(channel, msg, originalText, text, type);
 
   try {
@@ -203,6 +224,10 @@ async function processAlbum(ctxs, store) {
 
   const originalText = contentOf(msg);
   const text = render(channel, 'album', msg);
+  if (channel.testMode) {
+    await sendTestPreview(ctxs[0], store, msg, 'album', text);
+    return;
+  }
   const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
 
   try {
