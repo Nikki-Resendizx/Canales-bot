@@ -1,7 +1,7 @@
 import { ensureChannel, saveStore } from './store.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
-const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
+const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'Telegram', 'OFF'];
 
 function typeOf(msg) {
   if (msg.media_group_id) return 'album';
@@ -62,10 +62,6 @@ function hasHtml(text) {
   return /<\/?(?:b|strong|i|em|u|ins|s|strike|del|tg-spoiler|span|a|code|pre|tg-emoji|tg-time|details|blockquote|mark|sub|sup)(?:\s[^>]*)?>/i.test(text);
 }
 
-function hasRichMarkdown(text) {
-  return /(^|\n)#{1,6}\s+|\*\*|==[^=]+==|!\[[^\]]*\]\(|<tg-|<details\b|<tg-button-row\b|\|.+\|/i.test(text);
-}
-
 function hasMarkdownV2(text) {
   return /(^|[^\\])(?:\*[^*\n]+\*|_[^_\n]+_|__[^_\n]+__|~[^~\n]+~|\|\|[^|\n]+\|\||\[[^\]]+\]\([^\n)]+\)|\x60\x60\x60)/.test(text);
 }
@@ -76,11 +72,6 @@ function hasLegacyMarkdown(text) {
 
 function detectFormat(text) {
   const value = String(text || '');
-
-  // rich_message soporta Markdown enriquecido y HTML compatible en el mismo contenido.
-  if (hasRichMarkdown(value) || (hasHtml(value) && (value.includes('**') || value.includes('__') || value.includes('~~')))) {
-    return 'rich_message';
-  }
 
   if (hasHtml(value)) return 'HTML';
   if (hasMarkdownV2(value)) return 'MarkdownV2';
@@ -140,28 +131,12 @@ function editOptions(channel, msg, originalText, finalText, type) {
   } else if (mode === 'Telegram') {
     const entities = originalEntities(msg, originalText, finalText);
     if (entities) options.entities = entities;
-  } else if (mode === 'rich_message') {
-    options.rich_message = { markdown: finalText };
   }
 
   return { options, mode };
 }
 
 async function applyEdit(ctx, msg, text, options) {
-  if (options.rich_message) {
-    const payload = {
-      chat_id: msg.chat.id,
-      message_id: msg.message_id,
-      rich_message: options.rich_message
-    };
-
-    if (options.reply_markup) payload.reply_markup = options.reply_markup;
-
-    return msg.text
-      ? ctx.telegram.callApi('editMessageText', payload)
-      : ctx.telegram.callApi('editMessageCaption', payload);
-  }
-
   if (msg.text) {
     return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || '', options);
   }
@@ -183,7 +158,7 @@ async function editOne(ctx, msg, store) {
   const { options, mode } = editOptions(channel, msg, originalText, text, type);
 
   try {
-    if (!text && !options.reply_markup && !options.rich_message) return;
+    if (!text && !options.reply_markup) return;
     await applyEdit(ctx, msg, text, options);
     store.stats.processed += 1;
     saveStore(store);
