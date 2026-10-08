@@ -202,11 +202,10 @@ export function registerAdmin(bot, store) {
     );
   });
 
-  bot.on('message', async ctx => {
-    if (!allowed(ctx)) return;
+  bot.on('message', async (ctx, next) => {
+    if (!allowed(ctx)) return next();
     const shared = ctx.message?.chat_shared;
-    if (!shared) return;
-    if (shared.request_id !== 1001) return;
+    if (!shared || shared.request_id !== 1001) return next();
     await addChannelFromChat(ctx, store, shared.chat_id, shared);
   });
 
@@ -453,10 +452,10 @@ export function registerAdmin(bot, store) {
   bot.action('admin:buttons', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
   bot.action('admin:settings', ctx => allowed(ctx) ? ctx.answerCbQuery('La configuración se administra por canal.') : ctx.answerCbQuery('Sin permiso'));
 
-  bot.on('text', async ctx => {
-    if (!allowed(ctx) || ctx.message.text.startsWith('/')) return;
+  bot.on('text', async (ctx, next) => {
+    if (!allowed(ctx) || ctx.message.text.startsWith('/')) return next();
     const s = getSession(ctx);
-    if (!s) return;
+    if (!s) return next();
 
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
 
