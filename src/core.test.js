@@ -78,3 +78,19 @@ test('AUTO preserves native Telegram entities when the text is unchanged', () =>
   assert.deepEqual(result.options.entities, entities);
   assert.equal(result.options.parse_mode, undefined);
 });
+
+test('AUTO shifts native Telegram entity offsets when a template adds a prefix', () => {
+  const channel = {
+    normalize: true,
+    buttons: [],
+    formats: { text: 'AUTO' },
+    templates: { text: 'Encabezado\\n{contenido}' },
+    hashtags: []
+  };
+  const entities = [{ type: 'bold', offset: 0, length: 4 }];
+  const message = { text: 'Hola', entities };
+  const result = postsModule.editOptions(channel, message, 'Hola', 'Encabezado\\nHola', 'text');
+
+  assert.equal(result.mode, 'Telegram');
+  assert.deepEqual(result.options.entities, [{ type: 'bold', offset: 11, length: 4 }]);
+});
