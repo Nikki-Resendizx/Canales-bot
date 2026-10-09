@@ -198,7 +198,7 @@ async function sendBatch(ctx, store, route, messages) {
 
 function queuePost(ctx, store, msg) {
   const sourceId = String(msg.chat?.id || '');
-  const routes = routesOf(store).filter(route => route.enabled && String(route.sourceId) === sourceId);
+  const routes = routesOf(store).filter(route => route.enabled && String(route.sourceId) === sourceId && store.channels[sourceId]?.enabled !== false && store.channels[String(route.targetId)]?.enabled !== false);
   if (!routes.length) return;
   // A destination is not processed as a source, preventing route loops.
   if (routesOf(store).some(route => route.enabled && String(route.targetId) === sourceId)) return;
