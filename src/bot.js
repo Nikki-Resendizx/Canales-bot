@@ -5,6 +5,7 @@ import { registerAdmin } from './admin.js';
 import { registerPosts } from './posts.js';
 import { registerPayments } from './payments.js';
 import { registerPublications } from './publications.js';
+import { registerDistribution } from './distribution.js';
 
 const token = String(process.env.BOT_TOKEN || '').trim();
 if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
@@ -25,6 +26,7 @@ bot.catch((err, ctx) => {
   console.error('[BOT ERROR]', err.description || err.message || err);
   recordAlert(store, 'bot-error', err.description || err.message || String(err), { updateType: ctx?.updateType || 'unknown' });
 });
+registerDistribution(bot, store);
 registerAdmin(bot, store);
 registerPosts(bot, store);
 registerPayments(bot, store);
@@ -42,6 +44,7 @@ bot.command('help', ctx => ctx.reply(
   '/start — iniciar el bot y abrir compras premium desde enlaces de canal.\n' +
   '/admin — abrir el panel administrativo.\n' +
   '/addchannel -100... — registrar un canal por ID.\n' +
+  '/distribution — administrar conexiones entre canales.\n' +
   '/publish — crear una publicación gratuita o premium.\n' +
   '/paysupport — solicitar ayuda con una compra.\n' +
   '/cancel — cancelar la operación actual.\n\n' +
