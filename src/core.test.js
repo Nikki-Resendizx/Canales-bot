@@ -84,7 +84,7 @@ test('AUTO shifts native Telegram entity offsets when a template adds a prefix',
     normalize: true,
     buttons: [],
     formats: { text: 'AUTO' },
-    templates: { text: 'Encabezado\\n{contenido}' },
+    templates: { text: 'Encabezado\n{contenido}' },
     hashtags: []
   };
   const entities = [{ type: 'bold', offset: 0, length: 4 }];
@@ -93,4 +93,22 @@ test('AUTO shifts native Telegram entity offsets when a template adds a prefix',
 
   assert.equal(result.mode, 'Telegram');
   assert.deepEqual(result.options.entities, [{ type: 'bold', offset: 11, length: 4 }]);
+});
+
+
+test('distribution connections persist and invalid routes are discarded', () => {
+  const store = storeModule.createStore();
+  store.global.distributionRoutes.push({
+    id: 'route-test',
+    sourceId: '-1001234567890',
+    targetId: '-1001234567891',
+    ownerId: '12345',
+    mode: 'copy',
+    enabled: true
+  });
+  storeModule.saveStore(store);
+  const loaded = storeModule.createStore();
+  assert.equal(loaded.global.distributionRoutes.length, 1);
+  assert.equal(loaded.global.distributionRoutes[0].mode, 'copy');
+  assert.equal(loaded.global.distributionRoutes[0].sourceId, '-1001234567890');
 });
