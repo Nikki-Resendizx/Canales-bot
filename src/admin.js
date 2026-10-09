@@ -19,7 +19,7 @@ const menu = {
     [{ text: '👥 ADMINISTRADORES', callback_data: 'admin:admins' }],
     [{ text: '📋 HISTORIAL', callback_data: 'admin:history' }],
     [{ text: '🚨 ALERTAS', callback_data: 'admin:alerts' }],
-    [{ text: '💾 BACKUPS', callback_data: 'admin:backup' }],
+    [{ text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' }],
     [{ text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }]
   ]}
 };
@@ -540,11 +540,71 @@ export function registerAdmin(bot, store) {
         source: Buffer.from(payload, 'utf8'),
         filename: 'canales-bot-backup.json'
       }, {
-        caption: '💾 BACKUP DE CANALES-BOT\n\nGuarda este archivo fuera del hosting para poder restaurar tu configuración.'
+        caption: '💾 BACKUP DE CANALES-BOT\n\nGuarda este archivo fuera del hosting para poder restaurarlo después.',
+        reply_markup: { inline_keyboard: [
+          [{ text: '♻️ RESTAURAR BACKUP', callback_data: 'admin:restore' }],
+          [{ text: '🔙 PANEL', callback_data: 'admin:home' }]
+        ] }
       });
     } catch (err) {
       console.error('[BACKUP]', err.description || err.message);
+      recordAlert(store, 'backup', err.description || err.message);
       await ctx.reply('❌ No pude generar el backup: ' + (err.description || err.message));
+    }
+  });
+
+  bot.action('admin:restore', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    setSession(ctx, { action: 'restore' });
+    await ctx.answerCbQuery();
+    await ctx.reply('♻️ RESTAURAR BACKUP\n\nEnvíame el archivo JSON exportado por Canales-bot. La restauración reemplazará la configuración actual.\n\n/cancel para cancelar.');
+  });
+
+  bot.on('document', async (ctx, next) => {
+    if (!allowed(ctx)) return next();
+    const session = getSession(ctx);
+    if (!session || session.action !== 'restore') return next();
+    const document = ctx.message.document;
+    if (!document || Number(document.file_size || 0) > 2 * 1024 * 1024) {
+      return ctx.reply('❌ El archivo no es válido o supera el límite de 2 MB.');
+    }
+    try {
+      const fileUrl = await ctx.telegram.getFileLink(document.file_id);
+      const response = await fetch(String(fileUrl));
+      if (!response.ok) throw new Error('No pude descargar el archivo de Telegram.');
+      const raw = await response.text();
+      if (Buffer.byteLength(raw, 'utf8') > 2 * 1024 * 1024) throw new Error('El backup supera el límite de 2 MB.');
+      const backup = JSON.parse(raw);
+      if (!backup || typeof backup.channels !== 'object' || Array.isArray(backup.channels) ||
+          !backup.global || typeof backup.global !== 'object') {
+        throw new Error('El JSON no tiene la estructura de un backup de Canales-bot.');
+      }
+
+      store.channels = backup.channels;
+      store.global = {
+        ...store.global,
+        ...backup.global,
+        templates: { ...store.global.templates, ...(backup.global.templates || {}) },
+        formats: { ...store.global.formats, ...(backup.global.formats || {}) }
+      };
+      store.publications = backup.publications && typeof backup.publications === 'object' ? backup.publications : {};
+      store.purchases = backup.purchases && typeof backup.purchases === 'object' ? backup.purchases : {};
+      store.stats = { ...store.stats, ...(backup.stats || {}) };
+      store.alerts = Array.isArray(backup.alerts) ? backup.alerts.slice(-100) : [];
+
+      for (const [id, channel] of Object.entries(store.channels)) {
+        if (!channel || typeof channel !== 'object' || Array.isArray(channel)) throw new Error('El backup contiene un canal inválido.');
+        ensureChannel(store, id, channel.title || '');
+      }
+      saveStore(store);
+      clearSession(ctx);
+      await ctx.reply('✅ Backup restaurado correctamente.\n\nCanales: ' + Object.keys(store.channels).length +
+        '\nPublicaciones: ' + Object.keys(store.publications).length +
+        '\nCompras registradas: ' + Object.keys(store.purchases).length);
+    } catch (err) {
+      console.error('[RESTORE]', err.description || err.message);
+      recordAlert(store, 'restore', err.description || err.message);
+      await ctx.reply('❌ No pude restaurar el backup: ' + (err.description || err.message));
     }
   });
 
