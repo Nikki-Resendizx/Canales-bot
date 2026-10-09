@@ -156,14 +156,17 @@ export function registerPayments(bot, store) {
 
     try {
       await deliverPurchase(ctx.telegram, store, purchase);
-      await ctx.reply('✅ Pago confirmado.\n\n🔓 Tu contenido premium fue entregado.');
     } catch (err) {
       purchase.deliveryStatus = 'failed';
       purchase.deliveryError = String(err.description || err.message || 'Error de entrega').slice(0, 500);
       saveStore(store);
       console.error('[PAYMENT DELIVERY]', chargeId, purchase.deliveryError);
       recordAlert(store, 'payment-delivery', purchase.deliveryError, { chargeId, userId: purchase.userId, publicationId: purchase.publicationId });
-      await ctx.reply('⚠️ Tu pago fue confirmado, pero la entrega automática falló. Usa /paysupport; tu compra quedó registrada.');
+      try {
+        await ctx.reply('⚠️ Tu pago fue confirmado, pero la entrega automática falló. Usa /paysupport; tu compra quedó registrada.');
+      } catch (replyError) {
+        console.error('[PAYMENT ERROR NOTICE]', replyError.description || replyError.message);
+      }
       await notifyAdmins(ctx.telegram, store,
         '🚨 ENTREGA PREMIUM FALLIDA\nUsuario: ' + purchase.userId +
         '\nPublicación: ' + purchase.publicationId +
@@ -172,6 +175,12 @@ export function registerPayments(bot, store) {
         '\nError: ' + purchase.deliveryError +
         '\nUsa /retrydelivery ' + chargeId
       );
+      return;
+    }
+    try {
+      await ctx.reply('✅ Pago confirmado.\n\n🔓 Tu contenido premium fue entregado.');
+    } catch (replyError) {
+      console.error('[PAYMENT CONFIRMATION]', replyError.description || replyError.message);
     }
   });
 
@@ -193,17 +202,23 @@ export function registerPayments(bot, store) {
     if (purchase.deliveryStatus === 'delivered') return ctx.reply('ℹ️ El contenido ya figura como entregado.');
     try {
       await deliverPurchase(ctx.telegram, store, purchase);
-      await ctx.reply('✅ Entrega reintentada para el usuario ' + purchase.userId + '.');
-      try {
-        await ctx.telegram.sendMessage(purchase.userId, '✅ Se ha completado la entrega pendiente de tu compra.');
-      } catch (notifyError) {
-        console.error('[DELIVERY NOTICE]', notifyError.description || notifyError.message);
-      }
     } catch (err) {
       purchase.deliveryStatus = 'failed';
       purchase.deliveryError = String(err.description || err.message || 'Error de entrega').slice(0, 500);
       saveStore(store);
+      recordAlert(store, 'payment-delivery-retry', purchase.deliveryError, { chargeId, userId: purchase.userId });
       await ctx.reply('❌ Sigue fallando la entrega: ' + purchase.deliveryError);
+      return;
+    }
+    try {
+      await ctx.reply('✅ Entrega reintentada para el usuario ' + purchase.userId + '.');
+    } catch (replyError) {
+      console.error('[DELIVERY RETRY CONFIRMATION]', replyError.description || replyError.message);
+    }
+    try {
+      await ctx.telegram.sendMessage(purchase.userId, '✅ Se ha completado la entrega pendiente de tu compra.');
+    } catch (notifyError) {
+      console.error('[DELIVERY NOTICE]', notifyError.description || notifyError.message);
     }
   });
 
@@ -220,19 +235,25 @@ export function registerPayments(bot, store) {
         user_id: purchase.userId,
         telegram_payment_charge_id: chargeId
       });
-      purchase.refundedAt = new Date().toISOString();
-      purchase.refundStars = Number(purchase.stars || 0);
-      store.stats.stars = Math.max(0, Number(store.stats.stars || 0) - purchase.refundStars);
-      saveStore(store);
-      await ctx.reply('✅ Reembolso procesado para el usuario ' + purchase.userId + '.');
-      try {
-        await ctx.telegram.sendMessage(purchase.userId, '💳 Se ha procesado el reembolso de tu compra en Telegram Stars.');
-      } catch (notifyError) {
-        console.error('[REFUND NOTICE]', notifyError.description || notifyError.message);
-      }
     } catch (err) {
       recordAlert(store, 'refund', err.description || err.message, { chargeId, userId: purchase.userId });
       await ctx.reply('❌ No se pudo emitir el reembolso: ' + (err.description || err.message));
+      return;
+    }
+
+    purchase.refundedAt = new Date().toISOString();
+    purchase.refundStars = Number(purchase.stars || 0);
+    store.stats.stars = Math.max(0, Number(store.stats.stars || 0) - purchase.refundStars);
+    saveStore(store);
+    try {
+      await ctx.reply('✅ Reembolso procesado para el usuario ' + purchase.userId + '.');
+    } catch (replyError) {
+      console.error('[REFUND CONFIRMATION]', replyError.description || replyError.message);
+    }
+    try {
+      await ctx.telegram.sendMessage(purchase.userId, '💳 Se ha procesado el reembolso de tu compra en Telegram Stars.');
+    } catch (notifyError) {
+      console.error('[REFUND NOTICE]', notifyError.description || notifyError.message);
     }
   });
 }
