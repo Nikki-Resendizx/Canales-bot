@@ -162,7 +162,7 @@ async function applyEdit(ctx, msg, text, options) {
   return null;
 }
 
-function isFormattingError(err) {
+function isNotModifiedError(err) {\n  return /message is not modified/i.test(String(err?.description || err?.message || ''));\n}\n\nfunction isFormattingError(err) {
   const message = String(err?.description || err?.message || '').toLowerCase();
   return /parse entities|can't parse|cannot parse|unsupported start tag|rich.?message|entities.*invalid|message text is empty/.test(message);
 }
@@ -226,6 +226,7 @@ async function editOne(ctx, msg, store) {
     saveStore(store);
     console.log('[EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
   } catch (err) {
+    if (isNotModifiedError(err)) return;
     store.stats.errors += 1;
     saveStore(store);
     console.error('[EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
@@ -251,13 +252,14 @@ async function processAlbum(ctxs, store) {
 
   const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
   try {
-    if (msg.photo || msg.video) {
+    if (msg.photo || msg.video || msg.audio || msg.document) {
       await editWithFallback(ctxs[0], msg, text, options);
       store.stats.processed += 1;
       saveStore(store);
       console.log('[ALBUM EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
     }
   } catch (err) {
+    if (isNotModifiedError(err)) return;
     store.stats.errors += 1;
     saveStore(store);
     console.error('[ALBUM EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
