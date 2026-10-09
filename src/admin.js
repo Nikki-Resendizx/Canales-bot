@@ -72,6 +72,7 @@ const menu = {
     ],
     [
       { text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' },
+      { text: '🔀 DISTRIBUCIÓN', callback_data: 'admin:distribution' },
       { text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }
     ]
   ]}
