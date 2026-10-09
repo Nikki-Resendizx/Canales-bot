@@ -650,10 +650,11 @@ export function registerAdmin(bot, store) {
         ...store.global,
         ...backup.global,
         templates: { ...store.global.templates, ...(backup.global.templates || {}) },
-        formats: { ...store.global.formats, ...(backup.global.formats || {}) }
+        formats: { ...store.global.formats, ...(backup.global.formats || {}) },
+        adminIds: Array.isArray(backup.global.adminIds) ? backup.global.adminIds.map(String).filter(id => /^\d+$/.test(id)) : []
       };
-      store.publications = backup.publications && typeof backup.publications === 'object' ? backup.publications : {};
-      store.purchases = backup.purchases && typeof backup.purchases === 'object' ? backup.purchases : {};
+      store.publications = backup.publications && typeof backup.publications === 'object' && !Array.isArray(backup.publications) ? backup.publications : {};
+      store.purchases = backup.purchases && typeof backup.purchases === 'object' && !Array.isArray(backup.purchases) ? backup.purchases : {};
       store.stats = { ...store.stats, ...(backup.stats || {}) };
       store.alerts = Array.isArray(backup.alerts) ? backup.alerts.slice(-100) : [];
 
