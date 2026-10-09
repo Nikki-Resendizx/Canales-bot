@@ -53,7 +53,8 @@ export function render(channel, type, msg) {
   };
 
   let text = template.replace(/\{(contenido|titulo|descripcion|enlace|hashtags|fecha|canal)\}/g, (_, name) => values[name] ?? '');
-  if (hashtags && !text.includes(hashtags)) text += '\n\n' + hashtags;
+  const missingHashtags = (channel.hashtags || []).filter(tag => tag && !text.includes(tag));
+  if (missingHashtags.length) text += '\n\n' + missingHashtags.join(' ');
   return text.trim();
 }
 
