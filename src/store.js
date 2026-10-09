@@ -28,7 +28,8 @@ function emptyStore() {
       hashtags: [],
       buttons: [],
       formats: Object.fromEntries(Object.keys(DEFAULT).map(type => [type, 'AUTO'])),
-      normalize: true
+      normalize: true,
+      adminIds: []
     }
   };
 }
@@ -55,7 +56,8 @@ export function createStore() {
       ...base.global,
       ...(parsed.global || {}),
       templates: { ...DEFAULT, ...(parsed.global?.templates || {}) },
-      formats: { ...base.global.formats, ...(parsed.global?.formats || {}) }
+      formats: { ...base.global.formats, ...(parsed.global?.formats || {}) },
+      adminIds: Array.isArray(parsed.global?.adminIds) ? parsed.global.adminIds.map(String) : []
     };
     const channels = parsed.channels || {};
     const publications = parsed.publications || {};
