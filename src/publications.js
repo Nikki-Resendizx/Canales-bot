@@ -1,4 +1,4 @@
-import { ensureChannel, saveStore } from './store.js';
+import { ensureChannel, recordAlert, saveStore } from './store.js';
 
 function admin(ctx) {
   return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean).includes(String(ctx.from?.id));
@@ -79,6 +79,7 @@ export function registerPublications(bot, store) {
       store.stats.errors = Number(store.stats.errors || 0) + 1;
       saveStore(store);
       console.error('[PUBLISH]', err.description || err.message);
+      recordAlert(store, 'publish', err.description || err.message, { channelId: channel.id, publicationId });
       await ctx.reply('❌ No pude publicar: ' + (err.description || err.message));
     }
   }
