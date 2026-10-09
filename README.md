@@ -28,7 +28,7 @@ Bot de Telegram para administrar varios canales, normalizar publicaciones y vend
 Configura en el hosting:
 
 - `BOT_TOKEN`: token del bot.
-- `ADMIN_IDS`: IDs numéricos de administradores separados por comas.
+- `ADMIN_IDS`: IDs numéricos de administradores principales separados por comas. Desde el panel, los principales pueden añadir o quitar administradores adicionales.
 - `DATA_DIR` (opcional): ruta absoluta de una carpeta persistente del hosting. Si no se configura, se utiliza `data/` dentro del proyecto.
 
 No subas el archivo `.env` ni tokens a GitHub.
@@ -45,7 +45,8 @@ En FadeHost configura el comando de inicio como `npm start` y Node.js 20+.
 
 ## Comandos
 
-- `/start`: información básica.
+- `/start`: iniciar el bot y abrir compras premium desde enlaces de canal.
+- `/help`: mostrar la lista de comandos.
 - `/admin`: panel administrativo.
 - `/addchannel -100...`: registrar un canal por ID como alternativa.
 - `/publish`: crear publicación gratuita o con precio en Stars.
@@ -66,4 +67,5 @@ La configuración se guarda en `data/channels.json`, ignorado por Git. Este arch
 - Las facturas Stars y la entrega privada deben probarse en el entorno de pruebas de Telegram antes de vender contenido real.
 - `npm run validate` ejecuta comprobación de sintaxis y pruebas automatizadas de almacenamiento, alertas y plantillas.
 - El editor automático no puede garantizar que todo contenido se edite: Telegram puede rechazar mensajes sin permisos, con entidades inválidas o que no admitan edición.
+- Los botones `callback` personalizados muestran una respuesta genérica si no tienen una acción programada; los botones URL sí abren su destino.
 - El bot no incluye un módulo de modelos ni WebApp.
