@@ -115,7 +115,13 @@ async function finalizeRoute(ctx, store, mode) {
     return ctx.answerCbQuery('Perdiste permisos de administrador en uno de los canales.');
   }
   const routes = routesOf(store);
-  const duplicate = routes.find(r => String(r.ownerId) === key(ctx) && String(r.sourceId) === session.sourceId && String(r.targetId) === session.targetId);
+  const duplicate = routes.find(r => String(r.sourceId) === session.sourceId && String(r.targetId) === session.targetId);
+  if (duplicate && String(duplicate.ownerId) !== key(ctx)) {
+    sessions.delete(key(ctx));
+    return ctx.editMessageText('ℹ️ Ya existe una conexión entre estos canales, administrada por otro usuario. No se creó otra para evitar publicaciones duplicadas.', {
+      reply_markup: { inline_keyboard: [[{ text: '🔀 VER CONEXIONES', callback_data: 'admin:distribution' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] }
+    });
+  }
   if (duplicate) {
     duplicate.mode = mode;
     duplicate.enabled = true;
@@ -198,7 +204,7 @@ function queuePost(ctx, store, msg) {
   if (routesOf(store).some(route => route.enabled && String(route.targetId) === sourceId)) return;
   const groupId = msg.media_group_id ? sourceId + ':' + msg.media_group_id : null;
   if (!groupId) {
-    for (const route of routes) sendBatch(ctx, store, route, [msg]).catch(() => {});
+    setTimeout(() => { for (const route of routes) sendBatch(ctx, store, route, [msg]).catch(() => {}); }, 1800);
     return;
   }
   const batch = albumBatches.get(groupId) || { ctx, messages: [], routes, timer: null };
@@ -207,7 +213,7 @@ function queuePost(ctx, store, msg) {
   batch.timer = setTimeout(() => {
     albumBatches.delete(groupId);
     for (const route of batch.routes) sendBatch(batch.ctx, store, route, batch.messages).catch(() => {});
-  }, 1400);
+  }, 2200);
   albumBatches.set(groupId, batch);
 }
 
