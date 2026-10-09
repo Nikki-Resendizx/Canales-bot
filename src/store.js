@@ -54,6 +54,11 @@ export function createStore() {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('La raíz del archivo no es un objeto.');
     if (parsed.channels != null && (typeof parsed.channels !== 'object' || Array.isArray(parsed.channels))) throw new Error('La lista de canales no es válida.');
     if (parsed.global != null && (typeof parsed.global !== 'object' || Array.isArray(parsed.global))) throw new Error('La configuración global no es válida.');
+    for (const field of ['publications', 'purchases', 'stats']) {
+      if (parsed[field] != null && (typeof parsed[field] !== 'object' || Array.isArray(parsed[field]))) {
+        throw new Error('El campo ' + field + ' no tiene una estructura válida.');
+      }
+    }
     const base = emptyStore();
     const global = {
       ...base.global,
