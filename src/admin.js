@@ -81,19 +81,17 @@ async function addChannelFromChat(ctx, store, chatId, shared = {}) {
     const c = ensureChannel(store, id, chat.title || shared.title || '');
     clearSession(ctx);
 
-    return ctx.reply(
+    await ctx.reply(
       (existed ? 'ℹ️ El canal ya estaba registrado.' : '✅ Canal agregado automáticamente.') +
       '\n\n📢 ' + (c.title || chat.title || 'Canal') +
       '\n🆔 ' + c.id +
       (chat.username ? '\n🔗 @' + chat.username : '') +
       '\n🟢 Listo para procesar publicaciones.',
-      {
-        ...removeKeyboard(),
-        reply_markup: {
-          inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]]
-        }
-      }
+      removeKeyboard()
     );
+    return ctx.reply('¿Quieres configurar otro canal o editar sus opciones?', {
+      reply_markup: { inline_keyboard: [[{ text: '📢 ABRIR CANALES', callback_data: 'admin:channels' }]] }
+    });
   } catch (err) {
     console.error('[ADD CHANNEL SHARED]', err.description || err.message);
     return ctx.reply('❌ Telegram no me permitió acceder al canal seleccionado.\n\nAsegúrate de que el bot tenga permisos de administrador para publicar y editar mensajes.', removeKeyboard());
@@ -427,7 +425,7 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const channels = Object.keys(store.channels || {}).length;
     await ctx.answerCbQuery();
-    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Canales: ' + channels + '\n📝 Publicaciones creadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:rules', async ctx => {
@@ -580,6 +578,12 @@ export function registerAdmin(bot, store) {
         throw new Error('El JSON no tiene la estructura de un backup de Canales-bot.');
       }
 
+      for (const [id, channel] of Object.entries(backup.channels)) {
+        if (!id || !channel || typeof channel !== 'object' || Array.isArray(channel)) {
+          throw new Error('El backup contiene un canal inválido.');
+        }
+      }
+
       store.channels = backup.channels;
       store.global = {
         ...store.global,
@@ -593,7 +597,6 @@ export function registerAdmin(bot, store) {
       store.alerts = Array.isArray(backup.alerts) ? backup.alerts.slice(-100) : [];
 
       for (const [id, channel] of Object.entries(store.channels)) {
-        if (!channel || typeof channel !== 'object' || Array.isArray(channel)) throw new Error('El backup contiene un canal inválido.');
         ensureChannel(store, id, channel.title || '');
       }
       saveStore(store);
