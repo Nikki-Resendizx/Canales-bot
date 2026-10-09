@@ -512,7 +512,7 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const channels = (await visibleChannels(ctx, store)).length;
     await ctx.answerCbQuery();
-    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Tus canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Tus canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n🔀 Mensajes distribuidos: ' + Number(store.stats?.distributed || 0) + '\n⚠️ Errores de distribución: ' + Number(store.stats?.distributionErrors || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:rules', async ctx => {
