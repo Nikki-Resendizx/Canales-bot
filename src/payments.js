@@ -5,16 +5,18 @@ function parsePayload(payload) {
   return match ? { channelId: match[1], publicationId: match[2] } : null;
 }
 
-function adminIds() {
-  return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+function adminIds(store) {
+  const roots = String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+  const extras = Array.isArray(store.global?.adminIds) ? store.global.adminIds.map(String) : [];
+  return [...new Set([...roots, ...extras])];
 }
 
-function isAdmin(ctx) {
-  return adminIds().includes(String(ctx.from?.id));
+function isAdmin(ctx, store) {
+  return adminIds(store).includes(String(ctx.from?.id));
 }
 
-async function notifyAdmins(telegram, message) {
-  for (const adminId of adminIds()) {
+async function notifyAdmins(telegram, store, message) {
+  for (const adminId of adminIds(store)) {
     try {
       await telegram.sendMessage(adminId, message);
     } catch (err) {
@@ -111,7 +113,7 @@ export function registerPayments(bot, store) {
     const data = parsePayload(payment.invoice_payload);
     if (!data || payment.currency !== 'XTR') {
       console.error('[PAYMENT] Pago recibido con payload o moneda no válidos.');
-      await notifyAdmins(ctx.telegram, '🚨 Pago recibido con datos no válidos. Revisa la transacción en Telegram.');
+      await notifyAdmins(ctx.telegram, store, '🚨 Pago recibido con datos no válidos. Revisa la transacción en Telegram.');
       return;
     }
 
@@ -183,7 +185,7 @@ export function registerPayments(bot, store) {
   });
 
   bot.command('retrydelivery', async ctx => {
-    if (!isAdmin(ctx)) return;
+    if (!isAdmin(ctx, store)) return;
     const chargeId = String(ctx.message?.text || '').trim().split(/\s+/)[1];
     if (!chargeId) return ctx.reply('Uso: /retrydelivery <telegram_payment_charge_id>');
     const purchase = store.purchases[chargeId];
