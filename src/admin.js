@@ -15,6 +15,39 @@ function allowed(ctx) {
   return ids.includes(String(ctx.from?.id));
 }
 
+const channelAdminCache = new Map();
+const CHANNEL_ACCESS_TTL = 30_000;
+
+async function userIsChannelAdmin(ctx, channelId) {
+  const userId = String(ctx.from?.id || '');
+  const id = String(channelId);
+  if (!userId || !storeChannelExists(id)) return false;
+  const cacheKey = userId + ':' + id;
+  const cached = channelAdminCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.allowed;
+  let isAdmin = false;
+  try {
+    const member = await ctx.telegram.getChatMember(id, Number(userId));
+    isAdmin = ['creator', 'administrator'].includes(member?.status);
+  } catch (err) {
+    console.warn('[CHANNEL ACCESS]', userId, id, err.description || err.message);
+  }
+  channelAdminCache.set(cacheKey, { allowed: isAdmin, expiresAt: Date.now() + CHANNEL_ACCESS_TTL });
+  return isAdmin;
+}
+
+function storeChannelExists(id) {
+  return Boolean(activeStore?.channels?.[String(id)]);
+}
+
+async function visibleChannels(ctx, store) {
+  const channels = Object.values(store.channels || {});
+  const results = await Promise.all(channels.map(async channel =>
+    (await userIsChannelAdmin(ctx, channel.id)) ? channel : null
+  ));
+  return results.filter(Boolean);
+}
+
 const menu = {
   reply_markup: { inline_keyboard: [
     [{ text: '📢 CANALES', callback_data: 'admin:channels' }],
@@ -138,13 +171,14 @@ function channelMenu(c) {
 }
 
 async function showChannels(ctx, store, edit = false) {
-  const rows = Object.values(store.channels).map(c => [{
+  const channels = await visibleChannels(ctx, store);
+  const rows = channels.map(c => [{
     text: (c.enabled ? '🟢 ' : '🔴 ') + (c.title || c.id),
     callback_data: 'channel:' + c.id
   }]);
   rows.push([{ text: '➕ AGREGAR CANAL', callback_data: 'admin:addchannel' }]);
   rows.push([{ text: '🔙 VOLVER', callback_data: 'admin:home' }]);
-  const text = '📢 MIS CANALES\n\n' + (Object.keys(store.channels).length ? 'Selecciona un canal:' : 'No hay canales configurados.');
+  const text = '📢 MIS CANALES\n\n' + (channels.length ? 'Selecciona un canal:' : 'No tienes canales conectados donde seas administrador.');
   if (edit) await ctx.editMessageText(text, { reply_markup: { inline_keyboard: rows } });
   else await ctx.reply(text, { reply_markup: { inline_keyboard: rows } });
 }
@@ -192,6 +226,21 @@ async function addChannelFromId(ctx, store, rawId) {
 export function registerAdmin(bot, store) {
   activeStore = store;
   if (!Array.isArray(store.global.adminIds)) store.global.adminIds = [];
+
+  // Enforce channel-level Telegram administrator status on every channel callback,
+  // not just when rendering the channel list.
+  bot.use(async (ctx, next) => {
+    const data = ctx.callbackQuery?.data;
+    if (!data || !allowed(ctx)) return next();
+    const match = data.match(/-100\\d{5,}/);
+    if (!match) return next();
+    const channelId = match[0];
+    if (!store.channels[channelId] || !(await userIsChannelAdmin(ctx, channelId))) {
+      try { await ctx.answerCbQuery('⛔ Solo puedes administrar canales donde eres administrador.'); } catch {}
+      return;
+    }
+    return next();
+  });
 
   bot.command('admin', async ctx => {
     if (!allowed(ctx)) return ctx.reply('⛔ Sin permiso.');
@@ -450,14 +499,15 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:stats', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const channels = Object.keys(store.channels || {}).length;
+    const channels = (await visibleChannels(ctx, store)).length;
     await ctx.answerCbQuery();
-    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Tus canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:rules', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const rows = Object.values(store.channels).map(c => [{ text: '🧩 ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
+    const channels = await visibleChannels(ctx, store);
+    const rows = channels.map(c => [{ text: '🧩 ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
     rows.push([{ text: '📢 CANALES', callback_data: 'admin:channels' }]);
     rows.push([{ text: '🔙 PANEL', callback_data: 'admin:home' }]);
     await ctx.editMessageText('🧩 REGLAS AUTOMÁTICAS\n\nSelecciona un canal para activar o desactivar sus reglas:', { reply_markup: { inline_keyboard: rows } });
@@ -690,7 +740,8 @@ export function registerAdmin(bot, store) {
   });
   bot.action('admin:settings', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const rows = Object.values(store.channels).map(c => [{ text: '⚙️ ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
+    const channels = await visibleChannels(ctx, store);
+    const rows = channels.map(c => [{ text: '⚙️ ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
     rows.push([{ text: '🔙 PANEL', callback_data: 'admin:home' }]);
     await ctx.editMessageText('⚙️ CONFIGURACIÓN POR CANAL\n\nSelecciona un canal para cambiar normalización, modo prueba y estado:', { reply_markup: { inline_keyboard: rows } });
     await ctx.answerCbQuery();
