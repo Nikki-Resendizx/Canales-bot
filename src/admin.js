@@ -571,7 +571,7 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:alerts', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const alerts = (store.alerts || []).slice(-8).reverse();
+    const alerts = (store.alerts || []).slice(-6).reverse();
     const body = alerts.length
       ? alerts.map(a => '• [' + a.type + '] ' + a.message + '\n  ' + a.at).join('\n')
       : 'No hay alertas registradas.';
@@ -624,15 +624,15 @@ export function registerAdmin(bot, store) {
     const session = getSession(ctx);
     if (!session || session.action !== 'restore') return next();
     const document = ctx.message.document;
-    if (!document || Number(document.file_size || 0) > 2 * 1024 * 1024) {
-      return ctx.reply('❌ El archivo no es válido o supera el límite de 2 MB.');
+    if (!document || Number(document.file_size || 0) > 10 * 1024 * 1024) {
+      return ctx.reply('❌ El archivo no es válido o supera el límite de 10 MB.');
     }
     try {
       const fileUrl = await ctx.telegram.getFileLink(document.file_id);
       const response = await fetch(String(fileUrl));
       if (!response.ok) throw new Error('No pude descargar el archivo de Telegram.');
       const raw = await response.text();
-      if (Buffer.byteLength(raw, 'utf8') > 2 * 1024 * 1024) throw new Error('El backup supera el límite de 2 MB.');
+      if (Buffer.byteLength(raw, 'utf8') > 10 * 1024 * 1024) throw new Error('El backup supera el límite de 2 MB.');
       const backup = JSON.parse(raw);
       if (!backup || typeof backup.channels !== 'object' || Array.isArray(backup.channels) ||
           !backup.global || typeof backup.global !== 'object') {
