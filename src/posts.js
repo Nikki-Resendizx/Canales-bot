@@ -5,10 +5,9 @@ const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Tele
 
 function typeOf(msg) {
   if (msg.media_group_id) return 'album';
+  if (msg.forward_origin || msg.forward_from || msg.forward_from_chat || msg.forward_sender_name) return 'forwarded';
   if (msg.photo) return 'photo';
   if (msg.video) return 'video';
-  if (msg.forward_origin) return 'forwarded';
-
   const text = msg.text || msg.caption || '';
   return URL_RE.test(text) ? 'link' : 'text';
 }
@@ -41,8 +40,8 @@ function render(channel, type, msg) {
   let content = contentOf(msg);
   if (channel.normalize) content = normalize(content);
 
-  const template = channel.templates[type] || '{contenido}';
-  const hashtags = channel.hashtags.join(' ');
+  const template = channel.templates?.[type] || '{contenido}';
+  const hashtags = (channel.hashtags || []).join(' ');
   const values = {
     contenido: content,
     titulo: firstLine(content),
@@ -53,7 +52,7 @@ function render(channel, type, msg) {
     canal: msg.chat?.title || channel.title || ''
   };
 
-  let text = template.replace(/\{(contenido|titulo|descripcion|enlace|hashtags|fecha|canal)\}/g, (_, key) => values[key] ?? '');
+  let text = template.replace(/\{(contenido|titulo|descripcion|enlace|hashtags|fecha|canal)\}/g, (_, name) => values[name] ?? '');
   if (hashtags && !text.includes(hashtags)) text += '\n\n' + hashtags;
   return text.trim();
 }
@@ -67,8 +66,6 @@ function hasRichMarkdown(text) {
 }
 
 function hasMarkdownV2(text) {
-  // Detect only markers that distinguish MarkdownV2 from legacy Markdown.
-  // Simple *bold*, _italic_ and [links](url) remain legacy Markdown in AUTO mode.
   return /(^|[^\\])(?:__[^_\n]+__|~[^~\n]+~|\|\|[^|\n]+\|\||\x60\x60\x60|\\\\[.!#$%&()+\-=<>@\[\]{}])/m.test(text);
 }
 
@@ -78,7 +75,6 @@ function hasLegacyMarkdown(text) {
 
 function detectFormat(text) {
   const value = String(text || '');
-
   if (hasRichMarkdown(value)) return 'rich_message';
   if (hasHtml(value)) return 'HTML';
   if (hasMarkdownV2(value)) return 'MarkdownV2';
@@ -97,32 +93,32 @@ function originalEntities(msg, originalText, finalText) {
 }
 
 function buildMarkup(channel) {
-  if (!channel.buttons.length) return undefined;
+  const buttons = Array.isArray(channel.buttons) ? channel.buttons : [];
+  if (!buttons.length) return undefined;
 
-  const rows = channel.buttons
-    .filter(b => b && b.text)
-    .map(b => {
-      const button = { text: String(b.text) };
-      if (b.style) button.style = b.style;
-      if (b.icon_custom_emoji_id) button.icon_custom_emoji_id = String(b.icon_custom_emoji_id);
+  const rows = buttons.map((item) => {
+    if (!item || !item.text) return null;
+    const button = { text: String(item.text) };
+    if (['primary', 'success', 'danger'].includes(String(item.style || '').toLowerCase())) {
+      button.style = String(item.style).toLowerCase();
+    }
+    if (item.icon_custom_emoji_id) button.icon_custom_emoji_id = String(item.icon_custom_emoji_id);
 
-      if (b.type === 'url' && b.url) button.url = b.url;
-      else if (b.type === 'callback' && b.callback_data) button.callback_data = b.callback_data;
-      else return null;
+    if (item.type === 'url' && /^https?:\/\//i.test(String(item.url || ''))) button.url = item.url;
+    else if (item.type === 'callback' && item.callback_data && Buffer.byteLength(String(item.callback_data), 'utf8') <= 64) {
+      button.callback_data = String(item.callback_data);
+    } else return null;
 
-      return { button, row: Number.isInteger(Number(b.row)) ? Number(b.row) : 0 };
-    })
-    .filter(Boolean);
-
-  if (!rows.length) return undefined;
+    const row = Number(item.row);
+    return { button, row: Number.isInteger(row) && row >= 0 ? Math.min(row, 99) : 0 };
+  }).filter(Boolean);
 
   const grouped = [];
   for (const item of rows) {
     if (!grouped[item.row]) grouped[item.row] = [];
     grouped[item.row].push(item.button);
   }
-
-  return { inline_keyboard: grouped.filter(Boolean) };
+  return grouped.some(Boolean) ? { inline_keyboard: grouped.filter(Boolean) } : undefined;
 }
 
 function editOptions(channel, msg, originalText, finalText, type) {
@@ -130,19 +126,17 @@ function editOptions(channel, msg, originalText, finalText, type) {
   const mode = configured === 'AUTO' ? detectFormat(finalText) : configured;
   const options = {};
   const markup = buildMarkup(channel);
-
   if (markup) options.reply_markup = markup;
 
   if (mode === 'HTML' || mode === 'Markdown' || mode === 'MarkdownV2') {
     options.parse_mode = mode;
   } else if (mode === 'Telegram') {
     const entities = originalEntities(msg, originalText, finalText);
-    if (entities) options.entities = entities;
+    if (entities?.length) options.entities = entities;
   } else if (mode === 'rich_message' && msg.text) {
-    // RichMessage is supported by editMessageText, not editMessageCaption.
+    // Telegram Rich Messages support text edits, not caption edits.
     options.rich_message = { markdown: finalText };
   }
-
   return { options, mode };
 }
 
@@ -161,28 +155,54 @@ async function applyEdit(ctx, msg, text, options) {
     return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || '', options);
   }
 
-  if (msg.photo || msg.video) {
+  const isMedia = msg.photo || msg.video || msg.animation || msg.audio || msg.document;
+  if (isMedia) {
     return ctx.telegram.editMessageCaption(msg.chat.id, msg.message_id, undefined, text || '', options);
   }
-
   return null;
+}
+
+function isFormattingError(err) {
+  const message = String(err?.description || err?.message || '').toLowerCase();
+  return /parse entities|can't parse|cannot parse|unsupported start tag|rich.?message|entities.*invalid|message text is empty/.test(message);
+}
+
+async function editWithFallback(ctx, msg, text, options) {
+  try {
+    return await applyEdit(ctx, msg, text, options);
+  } catch (err) {
+    if (!isFormattingError(err)) throw err;
+    // A malformed template should not permanently prevent editing the post.
+    // Retry once as plain text while preserving the configured inline keyboard.
+    const fallback = {};
+    if (options.reply_markup) fallback.reply_markup = options.reply_markup;
+    console.warn('[EDIT FORMAT FALLBACK]', err.description || err.message);
+    return applyEdit(ctx, msg, text, fallback);
+  }
 }
 
 async function sendTestPreview(ctx, store, msg, type, text) {
   const admins = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
-  const preview = '🧪 VISTA PREVIA — MODO PRUEBA\\n\\n📢 Canal: ' + (msg.chat?.title || msg.chat?.id) +
-    '\\n🆔 Mensaje: ' + msg.message_id +
-    '\\n📦 Tipo: ' + type.toUpperCase() +
-    '\\n\\n' + (text || '[Sin texto]');
+  const preview = '🧪 VISTA PREVIA — MODO PRUEBA\n\n📢 Canal: ' + (msg.chat?.title || msg.chat?.id) +
+    '\n🆔 Mensaje: ' + msg.message_id +
+    '\n📦 Tipo: ' + type.toUpperCase() +
+    '\n\n' + (text || '[Sin texto]');
+  let delivered = 0;
   for (const adminId of admins) {
     try {
       await ctx.telegram.sendMessage(adminId, preview);
+      delivered += 1;
     } catch (err) {
       console.error('[TEST PREVIEW]', adminId, err.description || err.message);
     }
   }
-  store.stats.processed += 1;
-  saveStore(store);
+  if (delivered) {
+    store.stats.processed += 1;
+    saveStore(store);
+  } else {
+    store.stats.errors += 1;
+    saveStore(store);
+  }
 }
 
 async function editOne(ctx, msg, store) {
@@ -196,29 +216,27 @@ async function editOne(ctx, msg, store) {
     await sendTestPreview(ctx, store, msg, type, text);
     return;
   }
-  const { options, mode } = editOptions(channel, msg, originalText, text, type);
 
+  const { options, mode } = editOptions(channel, msg, originalText, text, type);
   try {
     if (!text && !options.reply_markup && !options.rich_message) return;
-    await applyEdit(ctx, msg, text, options);
+    await editWithFallback(ctx, msg, text, options);
     store.stats.processed += 1;
     saveStore(store);
     console.log('[EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
   } catch (err) {
     store.stats.errors += 1;
     saveStore(store);
-    console.error('[EDIT]', err.description || err.message);
+    console.error('[EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
   }
 }
 
 async function processAlbum(ctxs, store) {
   if (!ctxs.length) return;
-
   const first = ctxs[0].channelPost;
   const captioned = ctxs.find(ctx => contentOf(ctx.channelPost));
   const target = captioned || ctxs[0];
   const msg = target.channelPost;
-
   const channel = ensureChannel(ctxs[0].store, first.chat.id, first.chat.title);
   if (!channel.enabled) return;
 
@@ -228,11 +246,11 @@ async function processAlbum(ctxs, store) {
     await sendTestPreview(ctxs[0], store, msg, 'album', text);
     return;
   }
-  const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
 
+  const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
   try {
     if (msg.photo || msg.video) {
-      await applyEdit(ctxs[0], msg, text, options);
+      await editWithFallback(ctxs[0], msg, text, options);
       store.stats.processed += 1;
       saveStore(store);
       console.log('[ALBUM EDIT]', msg.chat.id, msg.message_id, 'format=' + mode);
@@ -240,7 +258,7 @@ async function processAlbum(ctxs, store) {
   } catch (err) {
     store.stats.errors += 1;
     saveStore(store);
-    console.error('[ALBUM EDIT]', err.description || err.message);
+    console.error('[ALBUM EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
   }
 }
 
@@ -261,27 +279,24 @@ export function registerPosts(bot, store) {
   });
 
   const albums = new Map();
-
   bot.on('channel_post', async ctx => {
     const msg = ctx.channelPost;
     const messageKey = String(msg.chat.id) + ':' + String(msg.message_id);
     if (!markProcessed(messageKey)) return;
 
     if (msg.media_group_id) {
-      const key = String(msg.chat.id) + ':' + msg.media_group_id;
-      const current = albums.get(key) || [];
+      const albumKey = String(msg.chat.id) + ':' + msg.media_group_id;
+      const current = albums.get(albumKey) || [];
       current.push(ctx);
-      albums.set(key, current);
-
+      albums.set(albumKey, current);
       clearTimeout(current.timer);
       current.timer = setTimeout(() => {
-        const batch = albums.get(key);
-        albums.delete(key);
-        if (batch) processAlbum(batch, store).catch(console.error);
+        const batch = albums.get(albumKey);
+        albums.delete(albumKey);
+        if (batch) processAlbum(batch, store).catch(err => console.error('[ALBUM PROCESS]', err));
       }, 1200);
       return;
     }
-
     await editOne(ctx, msg, store);
   });
 }
