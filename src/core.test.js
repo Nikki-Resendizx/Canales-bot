@@ -92,7 +92,7 @@ test('AUTO shifts native Telegram entity offsets when a template adds a prefix',
   const result = postsModule.editOptions(channel, message, 'Hola', 'Encabezado\\nHola', 'text');
 
   assert.equal(result.mode, 'Telegram');
-  assert.deepEqual(result.options.entities, [{ type: 'bold', offset: 11, length: 4 }]);
+  assert.deepEqual(result.options.entities, [{ type: 'bold', offset: 12, length: 4 }]);
 });
 
 
