@@ -1,6 +1,6 @@
 import { ensureChannel, recordAlert, saveStore } from './store.js';
 
-function admin(ctx) {
+function admin(ctx, store) {
   return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean).includes(String(ctx.from?.id));
 }
 
@@ -87,7 +87,7 @@ export function registerPublications(bot, store) {
   }
 
   bot.command('publish', async ctx => {
-    if (!admin(ctx)) return ctx.reply('⛔ Sin permiso.');
+    if (!admin(ctx, store)) return ctx.reply('⛔ Sin permiso.');
     const channels = Object.values(store.channels).filter(channel => channel.enabled);
     if (!channels.length) return ctx.reply('❌ Primero agrega y activa un canal.');
     sessions.set(key(ctx), { step: 'channel' });
@@ -102,7 +102,7 @@ export function registerPublications(bot, store) {
   });
 
   bot.action(/^pub:channel:(-?\d+)$/, async ctx => {
-    if (!admin(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!admin(ctx, store)) return ctx.answerCbQuery('Sin permiso');
     const session = sessions.get(key(ctx)) || {};
     if (!store.channels[ctx.match[1]]) return ctx.answerCbQuery('Canal no encontrado');
     session.channelId = ctx.match[1];
@@ -119,7 +119,7 @@ export function registerPublications(bot, store) {
   });
 
   bot.action(/^pub:mode:(free|paid)$/, async ctx => {
-    if (!admin(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!admin(ctx, store)) return ctx.answerCbQuery('Sin permiso');
     const session = sessions.get(key(ctx)) || {};
     if (!session.channelId) return ctx.answerCbQuery('Sesión expirada');
     session.step = ctx.match[1] === 'paid' ? 'price' : 'content';
@@ -132,7 +132,7 @@ export function registerPublications(bot, store) {
   });
 
   bot.on('message', async (ctx, next) => {
-    if (!admin(ctx)) return next();
+    if (!admin(ctx, store)) return next();
     const session = sessions.get(key(ctx));
     if (!session || session.step !== 'price') return next();
     const raw = String(ctx.message?.text || '').trim();
@@ -147,7 +147,7 @@ export function registerPublications(bot, store) {
   });
 
   bot.on('message', async (ctx, next) => {
-    if (!admin(ctx)) return next();
+    if (!admin(ctx, store)) return next();
     const userKey = key(ctx);
     const session = sessions.get(userKey);
     if (!session || session.step !== 'content') return next();
@@ -184,7 +184,7 @@ export function registerPublications(bot, store) {
   });
 
   bot.action('pub:cancel', async ctx => {
-    if (!admin(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!admin(ctx, store)) return ctx.answerCbQuery('Sin permiso');
     const userKey = key(ctx);
     const pending = pendingAlbums.get(userKey);
     if (pending?.timer) clearTimeout(pending.timer);
