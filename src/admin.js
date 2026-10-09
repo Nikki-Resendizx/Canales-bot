@@ -591,7 +591,7 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action('admin:backup', async ctx => {
-    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede exportar el backup.');
     await ctx.answerCbQuery();
     try {
       const payload = JSON.stringify(store, null, 2);
@@ -613,14 +613,14 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action('admin:restore', async ctx => {
-    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede restaurar el backup.');
     setSession(ctx, { action: 'restore' });
     await ctx.answerCbQuery();
     await ctx.reply('♻️ RESTAURAR BACKUP\n\nEnvíame el archivo JSON exportado por Canales-bot. La restauración reemplazará la configuración actual.\n\n/cancel para cancelar.');
   });
 
   bot.on('document', async (ctx, next) => {
-    if (!allowed(ctx)) return next();
+    if (!rootAllowed(ctx)) return next();
     const session = getSession(ctx);
     if (!session || session.action !== 'restore') return next();
     const document = ctx.message.document;
