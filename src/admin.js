@@ -445,7 +445,7 @@ export function registerAdmin(bot, store) {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const total = Object.values(store.publications || {}).filter(p => p.mode === 'paid').length;
     await ctx.answerCbQuery();
-    await ctx.editMessageText('⭐ PREMIUM / ESTRELLAS\n\nPublicaciones premium: ' + total + '\n⭐ Stars recibidas: ' + Number(store.stats?.stars || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n\nPara crear una venta usa /publish.');
+    await ctx.editMessageText('⭐ PREMIUM / ESTRELLAS\n\nPublicaciones premium: ' + total + '\n⭐ Stars netas registradas: ' + Number(store.stats?.stars || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n\nPara crear una venta usa /publish.', { reply_markup: { inline_keyboard: [[{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
   bot.action('admin:stats', async ctx => {
