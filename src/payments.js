@@ -1,4 +1,4 @@
-import { saveStore } from './store.js';
+import { recordAlert, saveStore } from './store.js';
 
 function parsePayload(payload) {
   const match = String(payload || '').match(/^paid:([^:]+):([^:]+)$/);
@@ -67,6 +67,7 @@ export function registerPayments(bot, store) {
       await ctx.answerPreCheckoutQuery(true);
     } catch (err) {
       console.error('[PRE CHECKOUT]', err.description || err.message);
+      recordAlert(store, 'pre-checkout', err.description || err.message);
       try {
         await ctx.answerPreCheckoutQuery(false, 'No pude validar el pedido. Inténtalo de nuevo.');
       } catch (answerError) {
@@ -90,6 +91,7 @@ export function registerPayments(bot, store) {
         String(publication.channelId) !== String(data.channelId) ||
         Number(payment.total_amount) !== Number(publication.priceStars)) {
       console.error('[PAYMENT] La compra no coincide con la publicación:', data.publicationId);
+      recordAlert(store, 'payment-validation', 'Pago recibido pero la publicación o el precio no coincide.', { publicationId: data.publicationId, userId: ctx.from.id, chargeId: payment.telegram_payment_charge_id });
       await notifyAdmins(ctx.telegram, '🚨 Pago recibido pero la publicación/precio no coincide. Usuario: ' + ctx.from.id + '. Charge ID: ' + payment.telegram_payment_charge_id);
       await ctx.reply('⚠️ Recibí el pago, pero necesito que soporte revise la orden. Usa /paysupport.');
       return;
@@ -129,6 +131,7 @@ export function registerPayments(bot, store) {
       purchase.deliveryError = String(err.description || err.message || 'Error de entrega').slice(0, 500);
       saveStore(store);
       console.error('[PAYMENT DELIVERY]', chargeId, purchase.deliveryError);
+      recordAlert(store, 'payment-delivery', purchase.deliveryError, { chargeId, userId: purchase.userId, publicationId: purchase.publicationId });
       await ctx.reply('⚠️ Tu pago fue confirmado, pero la entrega automática falló. Usa /paysupport; tu compra quedó registrada.');
       await notifyAdmins(ctx.telegram,
         '🚨 ENTREGA PREMIUM FALLIDA\nUsuario: ' + purchase.userId +
@@ -197,6 +200,7 @@ export function registerPayments(bot, store) {
         console.error('[REFUND NOTICE]', notifyError.description || notifyError.message);
       }
     } catch (err) {
+      recordAlert(store, 'refund', err.description || err.message, { chargeId, userId: purchase.userId });
       await ctx.reply('❌ No se pudo emitir el reembolso: ' + (err.description || err.message));
     }
   });
