@@ -50,20 +50,30 @@ async function visibleChannels(ctx, store) {
 
 const menu = {
   reply_markup: { inline_keyboard: [
-    [{ text: '📢 CANALES', callback_data: 'admin:channels' }],
-    [{ text: '📝 PLANTILLAS', callback_data: 'admin:templates' }],
-    [{ text: '#️⃣ HASHTAGS', callback_data: 'admin:hashtags' }],
-    [{ text: '🔘 BOTONES', callback_data: 'admin:buttons' }],
-    [{ text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' }],
-    [{ text: '⭐ PREMIUM / ESTRELLAS', callback_data: 'admin:premium' }],
-    [{ text: '📊 ESTADÍSTICAS', callback_data: 'admin:stats' }],
-    [{ text: '🧩 REGLAS AUTOMÁTICAS', callback_data: 'admin:rules' }],
-    [{ text: '🧪 MODO PRUEBA', callback_data: 'admin:test' }],
-    [{ text: '👥 ADMINISTRADORES', callback_data: 'admin:admins' }],
-    [{ text: '📋 HISTORIAL', callback_data: 'admin:history' }],
-    [{ text: '🚨 ALERTAS', callback_data: 'admin:alerts' }],
-    [{ text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' }],
-    [{ text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }]
+    [
+      { text: '📢 CANALES', callback_data: 'admin:channels' },
+      { text: '📝 PLANTILLAS', callback_data: 'admin:templates' },
+      { text: '#️⃣ HASHTAGS', callback_data: 'admin:hashtags' }
+    ],
+    [
+      { text: '🔘 BOTONES', callback_data: 'admin:buttons' },
+      { text: '📝 CREAR PUBLICACIÓN', callback_data: 'admin:publish' },
+      { text: '⭐ PREMIUM / ESTRELLAS', callback_data: 'admin:premium' }
+    ],
+    [
+      { text: '📊 ESTADÍSTICAS', callback_data: 'admin:stats' },
+      { text: '🧩 REGLAS AUTOMÁTICAS', callback_data: 'admin:rules' },
+      { text: '🧪 MODO PRUEBA', callback_data: 'admin:test' }
+    ],
+    [
+      { text: '👥 ADMINISTRADORES', callback_data: 'admin:admins' },
+      { text: '📋 HISTORIAL', callback_data: 'admin:history' },
+      { text: '🚨 ALERTAS', callback_data: 'admin:alerts' }
+    ],
+    [
+      { text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' },
+      { text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }
+    ]
   ]}
 };
 
