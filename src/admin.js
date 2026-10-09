@@ -733,11 +733,21 @@ export function registerAdmin(bot, store) {
       const parts = ctx.message.text.split('|').map(x => x.trim());
       if (parts.length < 6) return ctx.reply('❌ Formato: Texto | tipo | destino | estilo | emoji_id | fila');
       const [text, type, destination, style, emojiId, rowRaw] = parts;
-      if (!text || !['url', 'callback'].includes(type)) return ctx.reply('❌ Tipo debe ser url o callback.');
-      if (type === 'url' && !/^https?:\/\//i.test(destination)) return ctx.reply('❌ La URL debe comenzar con http:// o https://');
-      if (type === 'callback' && Buffer.byteLength(destination, 'utf8') > 64) return ctx.reply('❌ callback_data supera 64 bytes.');
+      if (!text || text.length > 64 || !['url', 'callback'].includes(type) || !destination) {
+        return ctx.reply('❌ Texto (máximo 64 caracteres), tipo y destino son obligatorios.');
+      }
+      if (type === 'url') {
+        try {
+          const parsedUrl = new URL(destination);
+          if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('protocol');
+        } catch {
+          return ctx.reply('❌ La URL debe ser válida y comenzar con http:// o https://');
+        }
+      }
+      if (type === 'callback' && Buffer.byteLength(destination, 'utf8') > 64) return ctx.reply('❌ callback_data debe tener entre 1 y 64 bytes.');
       if (style && !['primary', 'success', 'danger'].includes(style.toLowerCase())) return ctx.reply('❌ Estilo: primary, success o danger.');
-      const row = Number.isInteger(Number(rowRaw)) && Number(rowRaw) >= 0 ? Number(rowRaw) : 0;
+      if (emojiId && !/^\d+$/.test(emojiId)) return ctx.reply('❌ El ID de Emoji Premium debe ser numérico.');
+      const row = Number.isInteger(Number(rowRaw)) && Number(rowRaw) >= 0 ? Math.min(Number(rowRaw), 99) : 0;
       const button = { text, type, ...(type === 'url' ? { url: destination } : { callback_data: destination }), ...(style ? { style: style.toLowerCase() } : {}), ...(emojiId ? { icon_custom_emoji_id: emojiId } : {}), row };
       const c = ensureChannel(store, s.channelId);
       if (s.index === undefined) c.buttons.push(button); else c.buttons[s.index] = button;
