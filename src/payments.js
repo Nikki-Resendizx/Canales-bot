@@ -30,11 +30,14 @@ async function deliverPurchase(telegram, store, purchase) {
     throw new Error('La publicación no coincide con la compra.');
   }
 
-  await telegram.copyMessage(
-    purchase.userId,
-    publication.sourceChatId,
-    publication.sourceMessageId
-  );
+  const messageIds = Array.isArray(publication.sourceMessageIds) && publication.sourceMessageIds.length
+    ? publication.sourceMessageIds
+    : [publication.sourceMessageId];
+  if (messageIds.length > 1) {
+    await telegram.copyMessages(purchase.userId, publication.sourceChatId, messageIds);
+  } else {
+    await telegram.copyMessage(purchase.userId, publication.sourceChatId, messageIds[0]);
+  }
 
   purchase.deliveryStatus = 'delivered';
   purchase.deliveredAt = new Date().toISOString();
