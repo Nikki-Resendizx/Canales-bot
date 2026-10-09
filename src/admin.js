@@ -1,7 +1,17 @@
 import { ensureChannel, recordAlert, saveStore } from './store.js';
 
+let activeStore = null;
+
+function rootAdminIds() {
+  return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+}
+
+function rootAllowed(ctx) {
+  return rootAdminIds().includes(String(ctx.from?.id));
+}
+
 function allowed(ctx) {
-  const ids = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
+  const ids = [...rootAdminIds(), ...(Array.isArray(activeStore?.global?.adminIds) ? activeStore.global.adminIds.map(String) : [])];
   return ids.includes(String(ctx.from?.id));
 }
 
@@ -180,6 +190,9 @@ async function addChannelFromId(ctx, store, rawId) {
 }
 
 export function registerAdmin(bot, store) {
+  activeStore = store;
+  if (!Array.isArray(store.global.adminIds)) store.global.adminIds = [];
+
   bot.command('admin', async ctx => {
     if (!allowed(ctx)) return ctx.reply('⛔ Sin permiso.');
     clearSession(ctx);
@@ -510,9 +523,43 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:admins', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const ids = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
+    const roots = rootAdminIds();
+    const extras = Array.isArray(store.global.adminIds) ? store.global.adminIds.map(String) : [];
+    const lines = [
+      '🔐 Administradores principales (ENV):',
+      ...(roots.length ? roots.map(id => '• ' + id) : ['• Ninguno']),
+      '',
+      '👥 Administradores añadidos desde el panel:',
+      ...(extras.length ? extras.map(id => '• ' + id) : ['• Ninguno'])
+    ];
+    const rows = [];
+    if (rootAllowed(ctx)) {
+      rows.push([{ text: '➕ AÑADIR ADMINISTRADOR', callback_data: 'admin:addadmin' }]);
+      for (const id of extras) rows.push([{ text: '❌ QUITAR ' + id, callback_data: 'admin:removeadmin:' + id }]);
+    }
+    rows.push([{ text: '🔙 PANEL', callback_data: 'admin:home' }]);
+    await ctx.editMessageText(lines.join('\n'), { reply_markup: { inline_keyboard: rows } });
     await ctx.answerCbQuery();
-    await ctx.editMessageText('👥 ADMINISTRADORES\n\n' + (ids.length ? ids.map(id => '• ' + id).join('\n') : 'No hay ADMIN_IDS configurados.'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:addadmin', async ctx => {
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede cambiar la lista.');
+    setSession(ctx, { action: 'addadmin' });
+    await ctx.answerCbQuery();
+    await ctx.reply('👥 AÑADIR ADMINISTRADOR\n\nEnvíame el ID numérico de Telegram del nuevo administrador.\n\n/cancel para cancelar.');
+  });
+
+  bot.action(/^admin:removeadmin:(\d+)$/, async ctx => {
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede cambiar la lista.');
+    const id = ctx.match[1];
+    store.global.adminIds = (store.global.adminIds || []).map(String).filter(value => value !== id);
+    saveStore(store);
+    await ctx.answerCbQuery('Administrador eliminado');
+    const roots = rootAdminIds();
+    const extras = store.global.adminIds;
+    const lines = ['🔐 Administradores principales (ENV):', ...(roots.length ? roots.map(value => '• ' + value) : ['• Ninguno']), '', '👥 Administradores añadidos desde el panel:', ...(extras.length ? extras.map(value => '• ' + value) : ['• Ninguno'])];
+    const rows = [[{ text: '➕ AÑADIR ADMINISTRADOR', callback_data: 'admin:addadmin' }], ...extras.map(value => [{ text: '❌ QUITAR ' + value, callback_data: 'admin:removeadmin:' + value }]), [{ text: '🔙 PANEL', callback_data: 'admin:home' }]];
+    await ctx.editMessageText(lines.join('\n'), { reply_markup: { inline_keyboard: rows } });
   });
 
   bot.action('admin:history', async ctx => {
@@ -654,6 +701,19 @@ export function registerAdmin(bot, store) {
     if (!s) return next();
 
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
+
+    if (s.action === 'addadmin') {
+      const id = ctx.message.text.trim();
+      if (!/^\d+$/.test(id)) return ctx.reply('❌ El ID debe ser numérico. Inténtalo de nuevo o usa /cancel.');
+      if (rootAdminIds().includes(id) || store.global.adminIds.map(String).includes(id)) {
+        clearSession(ctx);
+        return ctx.reply('ℹ️ Ese ID ya tiene permisos de administrador.');
+      }
+      store.global.adminIds.push(id);
+      saveStore(store);
+      clearSession(ctx);
+      return ctx.reply('✅ Administrador añadido: ' + id);
+    }
 
     if (s.action === 'template') {
       const c = ensureChannel(store, s.channelId);
