@@ -243,7 +243,7 @@ export function registerAdmin(bot, store) {
   bot.use(async (ctx, next) => {
     const data = ctx.callbackQuery?.data;
     if (!data || !allowed(ctx)) return next();
-    const match = data.match(/-100\\d{5,}/);
+    const match = data.match(/-100\d{5,}/);
     if (!match) return next();
     const channelId = match[0];
     if (!store.channels[channelId] || !(await userIsChannelAdmin(ctx, channelId))) {
