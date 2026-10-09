@@ -37,7 +37,7 @@ No subas el archivo `.env` ni tokens a GitHub.
 
 ```sh
 npm install
-npm run check
+npm run validate
 npm start
 ```
 
@@ -52,6 +52,7 @@ En FadeHost configura el comando de inicio como `npm start` y Node.js 20+.
 - `/paysupport`: información de soporte de pagos.
 - `/refund <telegram_payment_charge_id>`: reembolsar una compra registrada como administrador.
 - `/retrydelivery <telegram_payment_charge_id>`: reintentar la entrega de una compra cuyo pago ya se confirmó.
+- Restaurar un backup: abre `/admin`, entra en `BACKUP / RESTAURAR` y sigue las instrucciones.
 - `/cancel`: cancelar la operación actual.
 
 ## Datos y persistencia
