@@ -5,7 +5,9 @@
   "main": "src/bot.js",
   "scripts": {
     "start": "node src/bot.js",
-    "check": "node --check src/bot.js && node --check src/store.js && node --check src/admin.js && node --check src/posts.js && node --check src/publications.js && node --check src/payments.js"
+    "check": "for file in src/*.js; do node --check \"$file\" || exit 1; done",
+    "test": "node --test src/*.test.js",
+    "validate": "npm run check && npm test"
   },
   "engines": {
     "node": ">=20"
