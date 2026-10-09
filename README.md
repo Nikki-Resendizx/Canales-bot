@@ -11,7 +11,7 @@ Bot de Telegram para administrar varios canales, normalizar publicaciones y vend
 - Protección contra re-procesamiento duplicado durante la ejecución actual.
 - Creación manual de publicaciones gratuitas desde `/publish`.
 - Publicaciones premium con enlace de compra privado, facturas Telegram Stars (`XTR`), validación de pre-checkout, registro de pagos, entrega privada y reintento de entrega.
-- Registro de estadísticas, compras, historial y alertas operativas.
+- Distribución multicanal: conecta varios orígenes a un destino, o crea varias conexiones independientes; reenvío nativo o copia sin cabecera; gestión por administrador, pausa/reanudación, prevención de rutas duplicadas y de bucles, soporte de álbumes, estadísticas y alertas de errores.\n- Registro de estadísticas, compras, historial y alertas operativas.
 - Backup y restauración de configuración desde el panel.
 - Panel administrativo `/admin`.
 - Reembolsos Stars mediante `/refund <telegram_payment_charge_id>`.
@@ -50,7 +50,7 @@ En FadeHost configura el comando de inicio como `npm start` y Node.js 20+.
 - `/help`: mostrar la lista de comandos.
 - `/admin`: panel administrativo.
 - `/addchannel -100...`: registrar un canal por ID como alternativa.
-- `/publish`: crear publicación gratuita o con precio en Stars.
+- `/publish`: crear publicación gratuita o con precio en Stars.\n- `/distribution`: administrar conexiones de distribución (también desde `/admin` → `DISTRIBUCIÓN`).
 - `/paysupport`: información de soporte de pagos.
 - `/refund <telegram_payment_charge_id>`: reembolsar una compra registrada como administrador.
 - `/retrydelivery <telegram_payment_charge_id>`: reintentar la entrega de una compra cuyo pago ya se confirmó.
@@ -61,7 +61,7 @@ En FadeHost configura el comando de inicio como `npm start` y Node.js 20+.
 
 La configuración se guarda en `data/channels.json`, ignorado por Git. Este archivo se crea en ejecución. Si FadeHost permite montar un volumen persistente, configura `DATA_DIR` con la ruta de ese volumen. El hosting debe ofrecer almacenamiento persistente o el bot perderá configuración, publicaciones y registros al reiniciarse o reconstruirse. Haz respaldos periódicos.
 
-## Limitaciones importantes
+## Distribución multicanal\n\n1. Registra los canales de origen y destino en `/admin` y comprueba que seas administrador de Telegram en ambos.\n2. El bot debe ser administrador en el origen para recibir publicaciones nuevas y en el destino con permiso para publicar mensajes.\n3. Abre `/admin` → `🔀 DISTRIBUCIÓN` → `➕ CREAR CONEXIÓN`, selecciona origen, destino y modo.\n4. Elige `REENVÍO NATIVO` para mantener la referencia al origen, o `COPIAR PUBLICACIÓN` para copiar sin cabecera cuando Telegram lo permita.\n5. La función procesa publicaciones nuevas; no importa automáticamente el historial antiguo. Los álbumes se envían agrupados cuando la API de Telegram lo permite. Los destinos de conexiones activas no se vuelven a procesar como orígenes, para evitar bucles.\n\n## Limitaciones importantes
 
 - La protección contra duplicados de publicaciones automáticas es en memoria; se reinicia al reiniciar el proceso.
 - Las estadísticas actuales cuentan acciones procesadas por el bot, no son analítica completa de Telegram.
