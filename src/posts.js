@@ -1,4 +1,4 @@
-import { ensureChannel, saveStore } from './store.js';
+import { ensureChannel, recordAlert, saveStore } from './store.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
 const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
@@ -201,6 +201,7 @@ async function sendTestPreview(ctx, store, msg, type, text) {
     saveStore(store);
   } else {
     store.stats.errors += 1;
+    recordAlert(store, 'test-preview', 'No se pudo enviar la vista previa a ningún administrador.', { chatId: msg.chat?.id, messageId: msg.message_id });
     saveStore(store);
   }
 }
@@ -228,6 +229,7 @@ async function editOne(ctx, msg, store) {
     store.stats.errors += 1;
     saveStore(store);
     console.error('[EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
+    recordAlert(store, 'edit', err.description || err.message, { chatId: msg.chat.id, messageId: msg.message_id });
   }
 }
 
@@ -259,6 +261,7 @@ async function processAlbum(ctxs, store) {
     store.stats.errors += 1;
     saveStore(store);
     console.error('[ALBUM EDIT]', msg.chat.id, msg.message_id, err.description || err.message);
+    recordAlert(store, 'album-edit', err.description || err.message, { chatId: msg.chat.id, messageId: msg.message_id });
   }
 }
 
