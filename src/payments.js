@@ -46,6 +46,35 @@ async function deliverPurchase(telegram, store, purchase) {
 }
 
 export function registerPayments(bot, store) {
+  // Paid posts link to this private checkout so the buyer has started the bot
+  // before any digital goods are delivered.
+  bot.command('start', async (ctx, next) => {
+    const payload = String(ctx.message?.text || '').trim().split(/\s+/)[1] || '';
+    const match = payload.match(/^buy_([A-Za-z0-9_-]+)$/);
+    if (!match) return next();
+    if (ctx.chat?.type !== 'private') return ctx.reply('Abre el enlace de compra en un chat privado con el bot.');
+
+    const publication = store.publications[match[1]];
+    if (!publication || publication.mode !== 'paid' || publication.status !== 'published') {
+      return ctx.reply('❌ Esta publicación premium ya no está disponible.');
+    }
+    try {
+      return await ctx.telegram.callApi('sendInvoice', {
+        chat_id: ctx.chat.id,
+        title: 'Contenido Premium',
+        description: 'Desbloquea el contenido premium con Telegram Stars.',
+        payload: 'paid:' + publication.channelId + ':' + publication.id,
+        currency: 'XTR',
+        prices: [{ label: 'Contenido Premium', amount: Number(publication.priceStars) }],
+        start_parameter: 'buy_' + publication.id
+      });
+    } catch (err) {
+      console.error('[INVOICE]', err.description || err.message);
+      recordAlert(store, 'invoice', err.description || err.message, { publicationId: publication.id, userId: ctx.from.id });
+      return ctx.reply('❌ No pude crear la factura. Inténtalo de nuevo más tarde.');
+    }
+  });
+
   bot.on('pre_checkout_query', async ctx => {
     const query = ctx.preCheckoutQuery;
     try {
