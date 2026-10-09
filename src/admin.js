@@ -1,4 +1,4 @@
-import { ensureChannel, saveStore } from './store.js';
+import { ensureChannel, recordAlert, saveStore } from './store.js';
 
 function allowed(ctx) {
   const ids = String(process.env.ADMIN_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -216,17 +216,33 @@ export function registerAdmin(bot, store) {
     if (!update?.chat || update.chat.type !== 'channel') return;
 
     const status = update.new_chat_member?.status;
-    if (!['administrator', 'member'].includes(status)) return;
-
     try {
+      if (['left', 'kicked'].includes(status)) {
+        const existing = store.channels[String(update.chat.id)];
+        if (existing) {
+          existing.enabled = false;
+          saveStore(store);
+          recordAlert(store, 'channel-permission', 'El bot salió o perdió acceso al canal.', { channelId: String(update.chat.id), status });
+        }
+        return;
+      }
+
       const chat = await ctx.telegram.getChat(update.chat.id);
       if (chat.type !== 'channel') return;
       const c = ensureChannel(store, chat.id, chat.title || '');
-      c.enabled = true;
+      const member = update.new_chat_member;
+      const canPost = status === 'administrator' && member?.can_post_messages !== false;
+      c.enabled = canPost;
       saveStore(store);
+      if (!canPost) {
+        recordAlert(store, 'channel-permission', 'El bot fue añadido al canal sin permisos suficientes para publicar.', { channelId: String(chat.id), status });
+        console.warn('[AUTO CHANNEL] Permisos insuficientes:', chat.id);
+        return;
+      }
       console.log('[AUTO CHANNEL]', chat.id, chat.title || '');
     } catch (err) {
       console.error('[AUTO CHANNEL]', err.description || err.message);
+      recordAlert(store, 'channel-registration', err.description || err.message, { channelId: String(update.chat.id) });
     }
   });
 
@@ -416,8 +432,62 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:rules', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const rows = Object.values(store.channels).map(c => [{ text: '🧩 ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
+    rows.push([{ text: '📢 CANALES', callback_data: 'admin:channels' }]);
+    rows.push([{ text: '🔙 PANEL', callback_data: 'admin:home' }]);
+    await ctx.editMessageText('🧩 REGLAS AUTOMÁTICAS\n\nSelecciona un canal para activar o desactivar sus reglas:', { reply_markup: { inline_keyboard: rows } });
     await ctx.answerCbQuery();
-    await ctx.editMessageText('🧩 REGLAS AUTOMÁTICAS\n\nPor canal se pueden controlar plantillas, hashtags, formatos, botones y normalización.\n\nLa base está preparada para ampliar reglas sin mezclar configuraciones entre canales.', { reply_markup: { inline_keyboard: [[{ text: '📢 CANALES', callback_data: 'admin:channels' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action(/^ruleschannel:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    await ctx.editMessageText('🧩 REGLAS — ' + (c.title || c.id) +
+      '\n\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo') +
+      '\nNormalizar espacios: ' + (c.normalize ? '🟢 Sí' : '🔴 No') +
+      '\nModo prueba: ' + (c.testMode ? '🟢 Sí' : '🔴 No') +
+      '\nHashtags: ' + (c.hashtags.join(' ') || 'ninguno') +
+      '\nBotones: ' + c.buttons.length,
+      { reply_markup: { inline_keyboard: [
+        [{ text: c.normalize ? '🔴 DESACTIVAR NORMALIZACIÓN' : '🟢 ACTIVAR NORMALIZACIÓN', callback_data: 'normalizetoggle:' + c.id }],
+        [{ text: c.testMode ? '🧪 DESACTIVAR PRUEBA' : '🧪 ACTIVAR PRUEBA', callback_data: 'testmode:' + c.id }],
+        [{ text: c.enabled ? '🔴 DESACTIVAR CANAL' : '🟢 ACTIVAR CANAL', callback_data: 'toggle:' + c.id }],
+        [{ text: '🔙 REGLAS', callback_data: 'admin:rules' }]
+      ] } }
+    );
+    await ctx.answerCbQuery();
+  });
+
+  bot.action(/^normalizetoggle:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.normalize = !c.normalize;
+    saveStore(store);
+    await ctx.answerCbQuery(c.normalize ? 'Normalización activada' : 'Normalización desactivada');
+    await ctx.editMessageText('🧩 REGLAS — ' + (c.title || c.id) +
+      '\n\nNormalizar espacios: ' + (c.normalize ? '🟢 Sí' : '🔴 No'),
+      { reply_markup: { inline_keyboard: [
+        [{ text: c.normalize ? '🔴 DESACTIVAR NORMALIZACIÓN' : '🟢 ACTIVAR NORMALIZACIÓN', callback_data: 'normalizetoggle:' + c.id }],
+        [{ text: c.testMode ? '🧪 DESACTIVAR PRUEBA' : '🧪 ACTIVAR PRUEBA', callback_data: 'testmode:' + c.id }],
+        [{ text: c.enabled ? '🔴 DESACTIVAR CANAL' : '🟢 ACTIVAR CANAL', callback_data: 'toggle:' + c.id }],
+        [{ text: '🔙 REGLAS', callback_data: 'admin:rules' }]
+      ] } }
+    );
+  });
+
+  bot.action(/^testmode:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.testMode = !c.testMode;
+    saveStore(store);
+    await ctx.answerCbQuery(c.testMode ? 'Modo prueba activado' : 'Modo prueba desactivado');
+    await ctx.editMessageText('📢 ' + (c.title || c.id) + '\n\nModo prueba: ' + (c.testMode ? '🧪 ACTIVADO' : '🟢 DESACTIVADO') +
+      '\n\n' + (c.testMode ? 'Las publicaciones se enviarán como vista previa a los administradores sin editar el original.' : 'Las publicaciones volverán a editarse automáticamente.'),
+      { reply_markup: { inline_keyboard: [
+        [{ text: '⚙️ REGLAS', callback_data: 'ruleschannel:' + c.id }],
+        [{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]
+      ] } }
+    );
   });
 
   bot.action('admin:test', async ctx => {
@@ -442,8 +512,23 @@ export function registerAdmin(bot, store) {
 
   bot.action('admin:alerts', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const alerts = (store.alerts || []).slice(-8).reverse();
+    const body = alerts.length
+      ? alerts.map(a => '• [' + a.type + '] ' + a.message + '\n  ' + a.at).join('\n')
+      : 'No hay alertas registradas.';
+    await ctx.editMessageText('🚨 ALERTAS RECIENTES\n\n' + body, { reply_markup: { inline_keyboard: [
+      [{ text: '🧹 LIMPIAR ALERTAS', callback_data: 'admin:clearalerts' }],
+      [{ text: '🔙 PANEL', callback_data: 'admin:home' }]
+    ] } });
     await ctx.answerCbQuery();
-    await ctx.editMessageText('🚨 ALERTAS\n\nEl sistema registra errores de publicación y pagos en los logs del bot.\n\nPróxima fase: avisos directos al administrador cuando un canal pierda permisos.', { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:clearalerts', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    store.alerts = [];
+    saveStore(store);
+    await ctx.editMessageText('🚨 Alertas eliminadas.', { reply_markup: { inline_keyboard: [[{ text: '🔙 ALERTAS', callback_data: 'admin:alerts' }], [{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+    await ctx.answerCbQuery('Alertas limpiadas');
   });
 
   bot.action('admin:backup', async ctx => {
@@ -463,10 +548,28 @@ export function registerAdmin(bot, store) {
     }
   });
 
-  bot.action('admin:templates', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
-  bot.action('admin:hashtags', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
-  bot.action('admin:buttons', ctx => allowed(ctx) ? ctx.answerCbQuery('Entra a CANALES y selecciona un canal.') : ctx.answerCbQuery('Sin permiso'));
-  bot.action('admin:settings', ctx => allowed(ctx) ? ctx.answerCbQuery('La configuración se administra por canal.') : ctx.answerCbQuery('Sin permiso'));
+  bot.action('admin:templates', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await showChannels(ctx, store, true);
+    await ctx.answerCbQuery('Selecciona un canal');
+  });
+  bot.action('admin:hashtags', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await showChannels(ctx, store, true);
+    await ctx.answerCbQuery('Selecciona un canal');
+  });
+  bot.action('admin:buttons', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    await showChannels(ctx, store, true);
+    await ctx.answerCbQuery('Selecciona un canal');
+  });
+  bot.action('admin:settings', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const rows = Object.values(store.channels).map(c => [{ text: '⚙️ ' + (c.title || c.id), callback_data: 'ruleschannel:' + c.id }]);
+    rows.push([{ text: '🔙 PANEL', callback_data: 'admin:home' }]);
+    await ctx.editMessageText('⚙️ CONFIGURACIÓN POR CANAL\n\nSelecciona un canal para cambiar normalización, modo prueba y estado:', { reply_markup: { inline_keyboard: rows } });
+    await ctx.answerCbQuery();
+  });
 
   bot.on('text', async (ctx, next) => {
     if (!allowed(ctx) || ctx.message.text.startsWith('/')) return next();
