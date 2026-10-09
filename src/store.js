@@ -51,6 +51,9 @@ export function createStore() {
   try {
     if (!fs.existsSync(DATA_FILE)) return emptyStore();
     const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('La raíz del archivo no es un objeto.');
+    if (parsed.channels != null && (typeof parsed.channels !== 'object' || Array.isArray(parsed.channels))) throw new Error('La lista de canales no es válida.');
+    if (parsed.global != null && (typeof parsed.global !== 'object' || Array.isArray(parsed.global))) throw new Error('La configuración global no es válida.');
     const base = emptyStore();
     const global = {
       ...base.global,
@@ -66,12 +69,23 @@ export function createStore() {
     const stats = { ...base.stats, ...(parsed.stats || {}) };
 
     for (const key of Object.keys(channels)) {
+      if (!channels[key] || typeof channels[key] !== 'object' || Array.isArray(channels[key])) {
+        throw new Error('El canal ' + key + ' no tiene una estructura válida.');
+      }
       channels[key] = normalizeChannel(channels[key], global);
     }
 
     return { channels, publications, purchases, alerts, stats, global };
   } catch (err) {
     console.error('[STORE] No se pudo cargar data/channels.json:', err.message);
+    try {
+      if (fs.existsSync(DATA_FILE)) {
+        fs.copyFileSync(DATA_FILE, DATA_FILE + '.corrupt-' + Date.now());
+        console.error('[STORE] Se conservó una copia del archivo dañado para recuperación.');
+      }
+    } catch (backupError) {
+      console.error('[STORE] No pude preservar el archivo dañado:', backupError.message);
+    }
     return emptyStore();
   }
 }
@@ -82,8 +96,10 @@ export function saveStore(store) {
     const temp = DATA_FILE + '.tmp';
     fs.writeFileSync(temp, JSON.stringify(store, null, 2), 'utf8');
     fs.renameSync(temp, DATA_FILE);
+    return true;
   } catch (err) {
     console.error('[STORE] No se pudo guardar la configuración:', err.message);
+    return false;
   }
 }
 
