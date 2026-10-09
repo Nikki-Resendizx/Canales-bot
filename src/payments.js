@@ -164,7 +164,7 @@ export function registerPayments(bot, store) {
       console.error('[PAYMENT DELIVERY]', chargeId, purchase.deliveryError);
       recordAlert(store, 'payment-delivery', purchase.deliveryError, { chargeId, userId: purchase.userId, publicationId: purchase.publicationId });
       await ctx.reply('⚠️ Tu pago fue confirmado, pero la entrega automática falló. Usa /paysupport; tu compra quedó registrada.');
-      await notifyAdmins(ctx.telegram,
+      await notifyAdmins(ctx.telegram, store,
         '🚨 ENTREGA PREMIUM FALLIDA\nUsuario: ' + purchase.userId +
         '\nPublicación: ' + purchase.publicationId +
         '\nStars: ' + purchase.stars +
