@@ -123,7 +123,7 @@ export function registerPayments(bot, store) {
         Number(payment.total_amount) !== Number(publication.priceStars)) {
       console.error('[PAYMENT] La compra no coincide con la publicación:', data.publicationId);
       recordAlert(store, 'payment-validation', 'Pago recibido pero la publicación o el precio no coincide.', { publicationId: data.publicationId, userId: ctx.from.id, chargeId: payment.telegram_payment_charge_id });
-      await notifyAdmins(ctx.telegram, '🚨 Pago recibido pero la publicación/precio no coincide. Usuario: ' + ctx.from.id + '. Charge ID: ' + payment.telegram_payment_charge_id);
+      await notifyAdmins(ctx.telegram, store, '🚨 Pago recibido pero la publicación/precio no coincide. Usuario: ' + ctx.from.id + '. Charge ID: ' + payment.telegram_payment_charge_id);
       await ctx.reply('⚠️ Recibí el pago, pero necesito que soporte revise la orden. Usa /paysupport.');
       return;
     }
@@ -181,7 +181,7 @@ export function registerPayments(bot, store) {
       '\nFecha: ' + new Date().toISOString() +
       '\n\nEl usuario solicita ayuda con una compra de Telegram Stars.';
     await ctx.reply('💎 Solicitud registrada. Si tu compra no se entregó, un administrador revisará el pago.');
-    await notifyAdmins(ctx.telegram, message);
+    await notifyAdmins(ctx.telegram, store, message);
   });
 
   bot.command('retrydelivery', async ctx => {
