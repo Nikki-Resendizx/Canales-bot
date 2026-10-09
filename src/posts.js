@@ -121,9 +121,12 @@ function buildMarkup(channel) {
   return grouped.some(Boolean) ? { inline_keyboard: grouped.filter(Boolean) } : undefined;
 }
 
-function editOptions(channel, msg, originalText, finalText, type) {
+export function editOptions(channel, msg, originalText, finalText, type) {
   const configured = formatFor(channel, type);
-  const mode = configured === 'AUTO' ? detectFormat(finalText) : configured;
+  const nativeEntities = originalEntities(msg, originalText, finalText);
+  const mode = configured === 'AUTO'
+    ? (nativeEntities?.length ? 'Telegram' : detectFormat(finalText))
+    : configured;
   const options = {};
   const markup = buildMarkup(channel);
   if (markup) options.reply_markup = markup;
