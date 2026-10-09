@@ -39,15 +39,17 @@ export function registerPublications(bot, store) {
 
       let sent;
       if (session.mode === 'paid') {
-        sent = await ctx.telegram.callApi('sendInvoice', {
-          chat_id: channel.id,
-          title: 'Contenido Premium',
-          description: 'Desbloquea esta publicación con Telegram Stars.',
-          payload: 'paid:' + channel.id + ':' + publicationId,
-          currency: 'XTR',
-          prices: [{ label: 'Contenido Premium', amount: session.priceStars }],
-          start_parameter: 'premium_' + publicationId
-        });
+        const botInfo = await ctx.telegram.getMe();
+        const buyUrl = 'https://t.me/' + botInfo.username + '?start=buy_' + publicationId;
+        sent = await ctx.telegram.sendMessage(
+          channel.id,
+          '⭐ CONTENIDO PREMIUM\n\nPrecio: ' + session.priceStars + ' Telegram Stars.\n\nPulsa el botón para iniciar la compra de forma segura en privado. El contenido se entrega después de confirmar el pago.',
+          { reply_markup: { inline_keyboard: [[{
+            text: '⭐ COMPRAR POR ' + session.priceStars + ' STARS',
+            url: buyUrl,
+            style: 'success'
+          }]] } }
+        );
       } else if (messageIds.length > 1) {
         sent = await ctx.telegram.copyMessages(channel.id, ctx.chat.id, messageIds);
       } else {
