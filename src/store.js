@@ -21,6 +21,7 @@ function emptyStore() {
     channels: {},
     publications: {},
     purchases: {},
+    alerts: [],
     stats: { processed: 0, errors: 0, payments: 0, stars: 0 },
     global: {
       templates: { ...DEFAULT },
@@ -59,13 +60,14 @@ export function createStore() {
     const channels = parsed.channels || {};
     const publications = parsed.publications || {};
     const purchases = parsed.purchases || {};
+    const alerts = Array.isArray(parsed.alerts) ? parsed.alerts.slice(-100) : [];
     const stats = { ...base.stats, ...(parsed.stats || {}) };
 
     for (const key of Object.keys(channels)) {
       channels[key] = normalizeChannel(channels[key], global);
     }
 
-    return { channels, publications, purchases, stats, global };
+    return { channels, publications, purchases, alerts, stats, global };
   } catch (err) {
     console.error('[STORE] No se pudo cargar data/channels.json:', err.message);
     return emptyStore();
@@ -114,3 +116,16 @@ export function ensureChannel(store, id, title = '') {
 }
 
 export { DEFAULT };
+
+export function recordAlert(store, type, message, details = {}) {
+  if (!Array.isArray(store.alerts)) store.alerts = [];
+  store.alerts.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    type: String(type || 'info').slice(0, 40),
+    message: String(message || '').slice(0, 500),
+    details,
+    at: new Date().toISOString()
+  });
+  if (store.alerts.length > 100) store.alerts.splice(0, store.alerts.length - 100);
+  saveStore(store);
+}
