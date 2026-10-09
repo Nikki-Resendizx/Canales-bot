@@ -30,7 +30,23 @@ registerPosts(bot, store);
 registerPayments(bot, store);
 registerPublications(bot, store);
 
-bot.command('start', (ctx) => ctx.reply('🤖 Canales-bot\n\nUsa /admin para administrar canales y plantillas.'));
+bot.command('start', (ctx) => ctx.reply(
+  '🤖 CANALES-BOT\n\n' +
+  'Administra canales, aplica plantillas y publica contenido gratuito o premium.\n\n' +
+  'Si vienes desde una publicación premium, usa el botón de compra del canal para recibir la factura en este chat privado.\n\n' +
+  'Usa /help para ver los comandos disponibles.'
+));
+
+bot.command('help', ctx => ctx.reply(
+  '📚 AYUDA — CANALES-BOT\n\n' +
+  '/start — iniciar el bot y abrir compras premium desde enlaces de canal.\n' +
+  '/admin — abrir el panel administrativo.\n' +
+  '/addchannel -100... — registrar un canal por ID.\n' +
+  '/publish — crear una publicación gratuita o premium.\n' +
+  '/paysupport — solicitar ayuda con una compra.\n' +
+  '/cancel — cancelar la operación actual.\n\n' +
+  'Los comandos /refund y /retrydelivery están reservados a administradores.'
+));
 
 bot.on('callback_query', async (ctx, next) => {
   if (!ctx.callbackQuery?.data) return next();
