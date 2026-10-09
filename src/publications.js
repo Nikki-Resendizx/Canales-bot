@@ -1,7 +1,9 @@
 import { ensureChannel, recordAlert, saveStore } from './store.js';
 
 function admin(ctx, store) {
-  return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean).includes(String(ctx.from?.id));
+  const roots = String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+  const extras = Array.isArray(store.global?.adminIds) ? store.global.adminIds.map(String) : [];
+  return [...new Set([...roots, ...extras])].includes(String(ctx.from?.id));
 }
 
 function makeId() {
