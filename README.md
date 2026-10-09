@@ -5,6 +5,7 @@ Bot de Telegram para administrar varios canales, normalizar publicaciones y vend
 ## Funciones actuales
 
 - Registro de canales mediante selector de Telegram y detección de cambios de membresía del bot.
+- Visibilidad por administrador: cada administrador solo ve y configura los canales donde su propia cuenta de Telegram tiene rol de administrador o propietario; los botones también validan ese permiso.
 - Configuración independiente por canal: plantillas, hashtags, botones, formatos y activación.
 - Procesamiento de publicaciones nuevas, con detección de texto, enlaces, fotos, videos, reenviados y álbumes.
 - Protección contra re-procesamiento duplicado durante la ejecución actual.
