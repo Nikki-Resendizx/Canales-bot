@@ -36,7 +36,7 @@ function normalize(text) {
   return value;
 }
 
-function render(channel, type, msg) {
+export function render(channel, type, msg) {
   let content = contentOf(msg);
   if (channel.normalize) content = normalize(content);
 
@@ -73,7 +73,7 @@ function hasLegacyMarkdown(text) {
   return /(^|[^\\])(?:\*[^*\n]+\*|_[^_\n]+_|\[[^\]]+\]\([^\n)]+\))/.test(text);
 }
 
-function detectFormat(text) {
+export function detectFormat(text) {
   const value = String(text || '');
   if (hasRichMarkdown(value)) return 'rich_message';
   if (hasHtml(value)) return 'HTML';
