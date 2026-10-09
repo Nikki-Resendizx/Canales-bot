@@ -90,8 +90,18 @@ export function registerPublications(bot, store) {
 
   bot.command('publish', async ctx => {
     if (!admin(ctx, store)) return ctx.reply('⛔ Sin permiso.');
-    const channels = Object.values(store.channels).filter(channel => channel.enabled);
-    if (!channels.length) return ctx.reply('❌ Primero agrega y activa un canal.');
+    const candidates = Object.values(store.channels).filter(channel => channel.enabled);
+    const checks = await Promise.all(candidates.map(async channel => {
+      try {
+        const member = await ctx.telegram.getChatMember(channel.id, ctx.from.id);
+        return ['creator', 'administrator'].includes(member?.status) ? channel : null;
+      } catch (err) {
+        console.warn('[PUBLISH CHANNEL ACCESS]', ctx.from.id, channel.id, err.description || err.message);
+        return null;
+      }
+    }));
+    const channels = checks.filter(Boolean);
+    if (!channels.length) return ctx.reply('❌ No tienes canales activos donde seas administrador y que estén conectados al bot.');
     sessions.set(key(ctx), { step: 'channel' });
     await ctx.reply('📝 CREAR PUBLICACIÓN\n\nSelecciona el canal:', {
       reply_markup: {
