@@ -88,8 +88,17 @@ function formatFor(channel, type) {
 }
 
 function originalEntities(msg, originalText, finalText) {
-  if (finalText !== originalText) return null;
-  return msg.text ? msg.entities : msg.caption_entities;
+  const entities = msg.text ? msg.entities : msg.caption_entities;
+  if (!Array.isArray(entities) || !entities.length) return null;
+  const rawText = String(msg.text || msg.caption || '');
+  const leadingTrim = rawText.length - rawText.trimStart().length;
+  const start = String(finalText || '').indexOf(originalText);
+  if (start < 0) return null;
+  const shift = start - leadingTrim;
+  return entities.map(entity => ({
+    ...entity,
+    offset: Math.max(0, Number(entity.offset || 0) + shift)
+  }));
 }
 
 function buildMarkup(channel) {
