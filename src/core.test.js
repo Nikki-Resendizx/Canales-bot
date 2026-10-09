@@ -61,3 +61,20 @@ test('templates substitute content fields and append hashtags only once', () => 
   assert.match(output, /^Título\nDescripción https:\/\/example\.com\nhttps:\/\/example\.com\n#Prueba$/);
   assert.equal(output.match(/#Prueba/g)?.length, 1);
 });
+
+test('AUTO preserves native Telegram entities when the text is unchanged', () => {
+  const channel = {
+    normalize: true,
+    buttons: [],
+    formats: { text: 'AUTO' },
+    templates: { text: '{contenido}' },
+    hashtags: []
+  };
+  const entities = [{ type: 'bold', offset: 0, length: 4 }];
+  const message = { text: 'Hola', entities };
+  const result = postsModule.editOptions(channel, message, 'Hola', 'Hola', 'text');
+
+  assert.equal(result.mode, 'Telegram');
+  assert.deepEqual(result.options.entities, entities);
+  assert.equal(result.options.parse_mode, undefined);
+});
