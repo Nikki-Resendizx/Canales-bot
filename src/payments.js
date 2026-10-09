@@ -208,7 +208,7 @@ export function registerPayments(bot, store) {
   });
 
   bot.command('refund', async ctx => {
-    if (!isAdmin(ctx)) return;
+    if (!isAdmin(ctx, store)) return;
     const chargeId = String(ctx.message?.text || '').trim().split(/\s+/)[1];
     if (!chargeId) return ctx.reply('Uso: /refund <telegram_payment_charge_id>');
     const purchase = store.purchases[chargeId];
