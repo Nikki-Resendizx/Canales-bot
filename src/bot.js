@@ -31,6 +31,12 @@ registerPayments(bot, store);
 registerPublications(bot, store);
 
 bot.command('start', (ctx) => ctx.reply('🤖 Canales-bot\n\nUsa /admin para administrar canales y plantillas.'));
+
+bot.on('callback_query', async (ctx, next) => {
+  if (!ctx.callbackQuery?.data) return next();
+  await ctx.answerCbQuery('Este botón no tiene una acción configurada.');
+});
+
 bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'pre_checkout_query'] })
   .then(() => console.log('🤖 Canales-bot iniciado.'))
   .catch(err => {
