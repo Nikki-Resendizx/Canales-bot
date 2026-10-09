@@ -71,11 +71,22 @@ function removeKeyboard() {
   return { reply_markup: { remove_keyboard: true } };
 }
 
+async function verifyBotChannelPermissions(ctx, chatId) {
+  const me = await ctx.telegram.getMe();
+  const member = await ctx.telegram.getChatMember(chatId, me.id);
+  return member?.status === 'administrator' &&
+    member.can_post_messages !== false &&
+    member.can_edit_messages !== false;
+}
+
 async function addChannelFromChat(ctx, store, chatId, shared = {}) {
   const id = String(chatId);
   try {
     const chat = await ctx.telegram.getChat(id);
     if (chat.type !== 'channel') return ctx.reply('❌ El chat seleccionado no es un canal.', removeKeyboard());
+    if (!await verifyBotChannelPermissions(ctx, id)) {
+      return ctx.reply('❌ El bot debe ser administrador del canal con permisos para publicar y editar mensajes.', removeKeyboard());
+    }
 
     const existed = Boolean(store.channels[id]);
     const c = ensureChannel(store, id, chat.title || shared.title || '');
@@ -153,6 +164,9 @@ async function addChannelFromId(ctx, store, rawId) {
   try {
     const chat = await ctx.telegram.getChat(id);
     if (chat.type !== 'channel') return ctx.reply('❌ Ese ID no corresponde a un canal.');
+    if (!await verifyBotChannelPermissions(ctx, id)) {
+      return ctx.reply('❌ El bot debe ser administrador del canal con permisos para publicar y editar mensajes.');
+    }
     const existed = Boolean(store.channels[id]);
     const c = ensureChannel(store, id, chat.title || '');
     clearSession(ctx);
@@ -229,7 +243,7 @@ export function registerAdmin(bot, store) {
       if (chat.type !== 'channel') return;
       const c = ensureChannel(store, chat.id, chat.title || '');
       const member = update.new_chat_member;
-      const canPost = status === 'administrator' && member?.can_post_messages !== false;
+      const canPost = status === 'administrator' && member?.can_post_messages !== false && member?.can_edit_messages !== false;
       c.enabled = canPost;
       saveStore(store);
       if (!canPost) {
