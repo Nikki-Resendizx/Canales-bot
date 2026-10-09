@@ -151,9 +151,15 @@ export function registerPublications(bot, store) {
     const userKey = key(ctx);
     const session = sessions.get(userKey);
     if (!session || session.step !== 'content') return next();
-    if (!ctx.message?.message_id || ctx.message.text?.startsWith('/')) return next();
-
     const message = ctx.message;
+    if (!message?.message_id || message.text?.startsWith('/') || message.successful_payment || message.invoice) return next();
+    const publishable = Boolean(
+      message.text || message.caption || message.photo || message.video ||
+      message.animation || message.audio || message.document || message.voice ||
+      message.video_note || message.sticker || message.contact || message.location ||
+      message.venue || message.poll || message.dice || message.forward_origin
+    );
+    if (!publishable) return next();
     if (message.media_group_id) {
       let pending = pendingAlbums.get(userKey);
       if (!pending || pending.mediaGroupId !== message.media_group_id) {
