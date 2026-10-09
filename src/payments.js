@@ -185,11 +185,12 @@ export function registerPayments(bot, store) {
   });
 
   bot.command('paysupport', async ctx => {
+    const details = String(ctx.message?.text || '').replace(/^\/paysupport(?:@\w+)?\s*/i, '').trim();
     const message = '🆘 SOPORTE DE PAGOS\n\nUsuario: ' + ctx.from.id +
       (ctx.from.username ? '\nUsername: @' + ctx.from.username : '') +
       '\nFecha: ' + new Date().toISOString() +
-      '\n\nEl usuario solicita ayuda con una compra de Telegram Stars.';
-    await ctx.reply('💎 Solicitud registrada. Si tu compra no se entregó, un administrador revisará el pago.');
+      '\nDetalle: ' + (details || 'El usuario solicita ayuda con una compra de Telegram Stars.');
+    await ctx.reply('💎 Solicitud registrada. Un administrador revisará tu mensaje y la transacción si corresponde.');
     await notifyAdmins(ctx.telegram, store, message);
   });
 
