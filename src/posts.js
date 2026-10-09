@@ -162,7 +162,11 @@ async function applyEdit(ctx, msg, text, options) {
   return null;
 }
 
-function isNotModifiedError(err) {\n  return /message is not modified/i.test(String(err?.description || err?.message || ''));\n}\n\nfunction isFormattingError(err) {
+function isNotModifiedError(err) {
+  return /message is not modified/i.test(String(err?.description || err?.message || ''));
+}
+
+function isFormattingError(err) {
   const message = String(err?.description || err?.message || '').toLowerCase();
   return /parse entities|can't parse|cannot parse|unsupported start tag|rich.?message|entities.*invalid|message text is empty/.test(message);
 }
