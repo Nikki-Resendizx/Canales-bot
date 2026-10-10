@@ -28,11 +28,11 @@ store.notifyAdmins = async alert => {
     ...String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim())
   ];
   const storeIds = Array.isArray(store.global?.adminIds) ? store.global.adminIds.map(String) : [];
-  const adminIds = [...new Set([...envIds, ...storeIds].filter(id => /^\\d+$/.test(id)))];
-  const text = '🚨 AVISO DEL BOT\\n\\n' +
-    'Tipo: ' + alert.type + '\\n' +
-    'Detalle: ' + alert.message + '\\n' +
-    'Fecha: ' + alert.at + '\\n\\n' +
+  const adminIds = [...new Set([...envIds, ...storeIds].filter(id => /^\d+$/.test(id)))];
+  const text = '🚨 AVISO DEL BOT\n\n' +
+    'Tipo: ' + alert.type + '\n' +
+    'Detalle: ' + alert.message + '\n' +
+    'Fecha: ' + alert.at + '\n\n' +
     'Cuando un administrador lo resuelva, este aviso se eliminará de los chats de todos los administradores.';
   for (const chatId of adminIds) {
     try {
