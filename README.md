@@ -13,7 +13,7 @@ Bot de Telegram para administrar varios canales, normalizar publicaciones y vend
 - Publicaciones premium con enlace de compra privado, facturas Telegram Stars (`XTR`), validación de pre-checkout, registro de pagos, entrega privada y reintento de entrega.
 - Distribución multicanal: conecta varios orígenes a un destino, o crea varias conexiones independientes; reenvío nativo o copia sin cabecera; gestión por administrador, pausa/reanudación, prevención de rutas duplicadas y de bucles, soporte de álbumes, estadísticas y alertas de errores.\n- Registro de estadísticas, compras, historial y alertas operativas.
 - Backup y restauración de configuración desde el panel.
-- Panel administrativo `/admin`.
+- Panel administrativo `/admin`, con gestión de administradores visible y modificable únicamente por el propietario definido en `OWNER_ID` (o por el primer ID de `ADMIN_IDS` si no se configura).
 - Reembolsos Stars mediante `/refund <telegram_payment_charge_id>`.
 
 ## Requisitos
@@ -29,7 +29,7 @@ Bot de Telegram para administrar varios canales, normalizar publicaciones y vend
 Configura en el hosting:
 
 - `BOT_TOKEN`: token del bot.
-- `ADMIN_IDS`: IDs numéricos de administradores principales separados por comas. Desde el panel, los principales pueden añadir o quitar administradores adicionales.
+- `OWNER_ID` (recomendado): ID numérico de Telegram del único propietario del bot. Solo esta cuenta puede ver la lista de administradores y añadir o quitar administradores desde el panel.\n- `ADMIN_IDS`: IDs numéricos de las cuentas autorizadas a usar el panel, separados por comas. Para compatibilidad, si `OWNER_ID` no está definido, el primer ID de `ADMIN_IDS` se considera el propietario. Los administradores adicionales agregados desde el panel no pueden ver ni modificar la lista de administradores.
 - `DATA_DIR` (opcional): ruta absoluta de una carpeta persistente del hosting. Si no se configura, se utiliza `data/` dentro del proyecto.
 
 No subas el archivo `.env` ni tokens a GitHub.
