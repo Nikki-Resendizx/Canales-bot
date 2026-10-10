@@ -10,7 +10,7 @@ function configuredAdminIds() {
 // si no está definido se toma el primer ID de ADMIN_IDS.
 function rootAdminIds() {
   const ownerId = String(process.env.OWNER_ID || configuredAdminIds()[0] || '').trim();
-  return /^\\d+$/.test(ownerId) ? [ownerId] : [];
+  return /^\d+$/.test(ownerId) ? [ownerId] : [];
 }
 
 function rootAllowed(ctx) {
@@ -628,7 +628,7 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action(/^admin:removeadmin:(\d+)$/, async ctx => {
-    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede cambiar la lista.');
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo el propietario del bot puede cambiar la lista.');
     const id = ctx.match[1];
     store.global.adminIds = (store.global.adminIds || []).map(String).filter(value => value !== id);
     saveStore(store);
