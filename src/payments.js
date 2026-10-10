@@ -47,7 +47,7 @@ async function notifyAdmins(telegram, store, message) {
 
 async function notifyPaymentSupport(telegram, store, message) {
   const channelId = String(process.env.PAYMENT_SUPPORT_CHANNEL_ID || '-1004424261064').trim();
-  if (!/^-?\\d+$/.test(channelId) || !channelId) {
+  if (!/^-?\d+$/.test(channelId) || !channelId) {
     throw new Error('PAYMENT_SUPPORT_CHANNEL_ID no es válido.');
   }
   if (!Array.isArray(store.paymentNotices)) store.paymentNotices = [];
