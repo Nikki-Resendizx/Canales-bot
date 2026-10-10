@@ -22,6 +22,7 @@ function emptyStore() {
     publications: {},
     purchases: {},
     alerts: [],
+    paymentNotices: [],
     stats: { processed: 0, errors: 0, payments: 0, stars: 0 },
     global: {
       templates: { ...DEFAULT },
@@ -73,6 +74,7 @@ export function createStore() {
     const publications = parsed.publications || {};
     const purchases = parsed.purchases || {};
     const alerts = Array.isArray(parsed.alerts) ? parsed.alerts.slice(-100) : [];
+    const paymentNotices = Array.isArray(parsed.paymentNotices) ? parsed.paymentNotices.slice(-100) : [];
     const stats = { ...base.stats, ...(parsed.stats || {}) };
 
     for (const key of Object.keys(channels)) {
@@ -82,7 +84,7 @@ export function createStore() {
       channels[key] = normalizeChannel(channels[key], global);
     }
 
-    return { channels, publications, purchases, alerts, stats, global };
+    return { channels, publications, purchases, alerts, paymentNotices, stats, global };
   } catch (err) {
     console.error('[STORE] No se pudo cargar data/channels.json:', err.message);
     try {
@@ -144,22 +146,13 @@ export { DEFAULT };
 
 export function recordAlert(store, type, message, details = {}) {
   if (!Array.isArray(store.alerts)) store.alerts = [];
-  const alert = {
+  store.alerts.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type: String(type || 'info').slice(0, 40),
     message: String(message || '').slice(0, 500),
     details,
-    at: new Date().toISOString(),
-    notifications: []
-  };
-  store.alerts.push(alert);
+    at: new Date().toISOString()
+  });
   if (store.alerts.length > 100) store.alerts.splice(0, store.alerts.length - 100);
   saveStore(store);
-
-  // The bot attaches this callback at startup to broadcast the same alert to all admins.
-  if (typeof store.notifyAdmins === 'function') {
-    Promise.resolve(store.notifyAdmins(alert)).catch(err => {
-      console.error('[ALERT NOTIFY]', err?.description || err?.message || err);
-    });
-  }
 }
