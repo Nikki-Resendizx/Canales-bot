@@ -144,13 +144,22 @@ export { DEFAULT };
 
 export function recordAlert(store, type, message, details = {}) {
   if (!Array.isArray(store.alerts)) store.alerts = [];
-  store.alerts.push({
+  const alert = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     type: String(type || 'info').slice(0, 40),
     message: String(message || '').slice(0, 500),
     details,
-    at: new Date().toISOString()
-  });
+    at: new Date().toISOString(),
+    notifications: []
+  };
+  store.alerts.push(alert);
   if (store.alerts.length > 100) store.alerts.splice(0, store.alerts.length - 100);
   saveStore(store);
+
+  // The bot attaches this callback at startup to broadcast the same alert to all admins.
+  if (typeof store.notifyAdmins === 'function') {
+    Promise.resolve(store.notifyAdmins(alert)).catch(err => {
+      console.error('[ALERT NOTIFY]', err?.description || err?.message || err);
+    });
+  }
 }
