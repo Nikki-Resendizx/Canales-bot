@@ -647,28 +647,26 @@ export function registerAdmin(bot, store) {
     await ctx.editMessageText('📋 HISTORIAL\n\n' + (items.length ? items.map(p => '• ' + p.id + ' — ' + (p.mode === 'paid' ? '⭐ PREMIUM' : '🆓 GRATUITA') + ' — ' + p.status).join('\n') : 'Sin publicaciones registradas.'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
   });
 
-  bot.action(/^alertresolve:([a-z0-9]+)$/, async ctx => {
+  bot.action(/^paymentresolve:([a-z0-9]+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
-    const alert = (store.alerts || []).find(item => item.id === ctx.match[1]);
-    if (!alert) return ctx.answerCbQuery('Este aviso ya no existe.');
-    if (alert.resolvedAt) return ctx.answerCbQuery('Este aviso ya fue resuelto.');
+    const notice = (store.paymentNotices || []).find(item => item.id === ctx.match[1]);
+    if (!notice) return ctx.answerCbQuery('Este aviso de pago ya no existe.');
+    if (notice.resolvedAt) return ctx.answerCbQuery('Este aviso de pago ya fue resuelto.');
 
-    alert.resolvedAt = new Date().toISOString();
-    alert.resolvedBy = String(ctx.from?.id || '');
+    notice.resolvedAt = new Date().toISOString();
+    notice.resolvedBy = String(ctx.from?.id || '');
     saveStore(store);
 
-    const copies = Array.isArray(alert.notifications) ? alert.notifications : [];
-    await Promise.all(copies.map(async item => {
+    await Promise.all((notice.notifications || []).map(async item => {
       try {
         await ctx.telegram.deleteMessage(Number(item.chatId), Number(item.messageId));
       } catch (err) {
-        // A message may already be deleted or inaccessible; continue deleting the remaining copies.
-        console.warn('[ALERT DELETE]', item.chatId, item.messageId, err.description || err.message);
+        console.warn('[PAYMENT NOTICE DELETE]', item.chatId, item.messageId, err.description || err.message);
       }
     }));
-    alert.notifications = [];
+    notice.notifications = [];
     saveStore(store);
-    return ctx.answerCbQuery('Aviso resuelto y eliminado para todos los administradores.');
+    return ctx.answerCbQuery('Aviso de pago resuelto y borrado para todos.');
   });
 
   bot.action('admin:alerts', async ctx => {
