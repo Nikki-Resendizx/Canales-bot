@@ -45,6 +45,43 @@ async function notifyAdmins(telegram, store, message) {
   saveStore(store);
 }
 
+async function notifyPaymentSupport(telegram, store, message) {
+  const channelId = String(process.env.PAYMENT_SUPPORT_CHANNEL_ID || '-1004424261064').trim();
+  if (!/^ -?\\d+$/.test(channelId.replace(/ /g, '')) || !channelId) {
+    throw new Error('PAYMENT_SUPPORT_CHANNEL_ID no es válido.');
+  }
+  if (!Array.isArray(store.paymentNotices)) store.paymentNotices = [];
+  const notice = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    message: String(message || '').slice(0, 3500),
+    at: new Date().toISOString(),
+    notifications: [],
+    resolvedAt: null,
+    resolvedBy: null,
+    source: 'paysupport'
+  };
+  store.paymentNotices.push(notice);
+  if (store.paymentNotices.length > 100) store.paymentNotices.splice(0, store.paymentNotices.length - 100);
+  saveStore(store);
+
+  try {
+    const sent = await telegram.sendMessage(channelId, notice.message, {
+      reply_markup: { inline_keyboard: [[{
+        text: '✅ RESOLVER AVISO',
+        callback_data: 'paymentresolve:' + notice.id
+      }]] }
+    });
+    notice.notifications.push({ chatId: channelId, messageId: String(sent.message_id) });
+    saveStore(store);
+    return true;
+  } catch (err) {
+    console.error('[PAYMENT SUPPORT CHANNEL]', channelId, err.description || err.message);
+    notice.deliveryError = String(err.description || err.message || 'No se pudo publicar en el canal').slice(0, 500);
+    saveStore(store);
+    return false;
+  }
+}
+
 async function deliverPurchase(telegram, store, purchase) {
   const publication = store.publications[purchase.publicationId];
   if (!publication) throw new Error('La publicación asociada ya no existe.');
@@ -210,8 +247,12 @@ export function registerPayments(bot, store) {
       (ctx.from.username ? '\nUsername: @' + ctx.from.username : '') +
       '\nFecha: ' + new Date().toISOString() +
       '\nDetalle: ' + (details || 'El usuario solicita ayuda con una compra de Telegram Stars.');
-    await ctx.reply('💎 Solicitud registrada. Un administrador revisará tu mensaje y la transacción si corresponde.');
-    await notifyAdmins(ctx.telegram, store, message);
+    const delivered = await notifyPaymentSupport(ctx.telegram, store, message);
+    if (delivered) {
+      await ctx.reply('💎 Solicitud registrada y enviada al canal de soporte de pagos.');
+    } else {
+      await ctx.reply('⚠️ Registré tu solicitud, pero no pude avisar al equipo de soporte. Inténtalo más tarde.');
+    }
   });
 
   bot.command('retrydelivery', async ctx => {
