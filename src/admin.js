@@ -783,6 +783,7 @@ export function registerAdmin(bot, store) {
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
 
     if (s.action === 'addadmin') {
+      if (!rootAllowed(ctx)) { clearSession(ctx); return ctx.reply('⛔ Solo el propietario del bot puede agregar administradores.'); }
       const id = ctx.message.text.trim();
       if (!/^\d+$/.test(id)) return ctx.reply('❌ El ID debe ser numérico. Inténtalo de nuevo o usa /cancel.');
       if (rootAdminIds().includes(id) || configuredAdminIds().includes(id) || store.global.adminIds.map(String).includes(id)) {
