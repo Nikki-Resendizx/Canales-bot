@@ -16,13 +16,33 @@ function isAdmin(ctx, store) {
 }
 
 async function notifyAdmins(telegram, store, message) {
+  if (!Array.isArray(store.paymentNotices)) store.paymentNotices = [];
+  const notice = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    message: String(message || '').slice(0, 3500),
+    at: new Date().toISOString(),
+    notifications: [],
+    resolvedAt: null,
+    resolvedBy: null
+  };
+  store.paymentNotices.push(notice);
+  if (store.paymentNotices.length > 100) store.paymentNotices.splice(0, store.paymentNotices.length - 100);
+  saveStore(store);
+
   for (const adminId of adminIds(store)) {
     try {
-      await telegram.sendMessage(adminId, message);
+      const sent = await telegram.sendMessage(adminId, notice.message, {
+        reply_markup: { inline_keyboard: [[{
+          text: '✅ RESOLVER AVISO DE PAGO PARA TODOS',
+          callback_data: 'paymentresolve:' + notice.id
+        }]] }
+      });
+      notice.notifications.push({ chatId: String(adminId), messageId: String(sent.message_id) });
     } catch (err) {
       console.error('[ADMIN NOTICE]', adminId, err.description || err.message);
     }
   }
+  saveStore(store);
 }
 
 async function deliverPurchase(telegram, store, purchase) {
