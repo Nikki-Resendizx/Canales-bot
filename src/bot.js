@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Telegraf } from 'telegraf';
-import { createStore, recordAlert } from './store.js';
+import { createStore, recordAlert, saveStore } from './store.js';
 import { registerAdmin } from './admin.js';
 import { registerPosts } from './posts.js';
 import { registerPayments } from './payments.js';
@@ -21,6 +21,34 @@ if (!adminIds.length || adminIds.some(id => !/^\d+$/.test(id))) {
 
 const bot = new Telegraf(token);
 const store = createStore();
+
+store.notifyAdmins = async alert => {
+  const envIds = [
+    String(process.env.OWNER_ID || '').trim(),
+    ...String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim())
+  ];
+  const storeIds = Array.isArray(store.global?.adminIds) ? store.global.adminIds.map(String) : [];
+  const adminIds = [...new Set([...envIds, ...storeIds].filter(id => /^\\d+$/.test(id)))];
+  const text = '🚨 AVISO DEL BOT\\n\\n' +
+    'Tipo: ' + alert.type + '\\n' +
+    'Detalle: ' + alert.message + '\\n' +
+    'Fecha: ' + alert.at + '\\n\\n' +
+    'Cuando un administrador lo resuelva, este aviso se eliminará de los chats de todos los administradores.';
+  for (const chatId of adminIds) {
+    try {
+      const sent = await bot.telegram.sendMessage(Number(chatId), text, {
+        reply_markup: { inline_keyboard: [[{
+          text: '✅ RESOLVER Y BORRAR PARA TODOS',
+          callback_data: 'alertresolve:' + alert.id
+        }]] }
+      });
+      alert.notifications.push({ chatId: String(chatId), messageId: String(sent.message_id) });
+    } catch (err) {
+      console.warn('[ALERT NOTIFY]', chatId, err.description || err.message);
+    }
+  }
+  saveStore(store);
+};
 
 bot.catch((err, ctx) => {
   console.error('[BOT ERROR]', err.description || err.message || err);
