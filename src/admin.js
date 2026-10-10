@@ -2,8 +2,15 @@ import { ensureChannel, recordAlert, saveStore } from './store.js';
 
 let activeStore = null;
 
-function rootAdminIds() {
+function configuredAdminIds() {
   return String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
+}
+
+// OWNER_ID define al propietario único. Para instalaciones existentes,
+// si no está definido se toma el primer ID de ADMIN_IDS.
+function rootAdminIds() {
+  const ownerId = String(process.env.OWNER_ID || configuredAdminIds()[0] || '').trim();
+  return /^\\d+$/.test(ownerId) ? [ownerId] : [];
 }
 
 function rootAllowed(ctx) {
@@ -11,7 +18,7 @@ function rootAllowed(ctx) {
 }
 
 function allowed(ctx) {
-  const ids = [...rootAdminIds(), ...(Array.isArray(activeStore?.global?.adminIds) ? activeStore.global.adminIds.map(String) : [])];
+  const ids = [...configuredAdminIds(), ...rootAdminIds(), ...(Array.isArray(activeStore?.global?.adminIds) ? activeStore.global.adminIds.map(String) : [])];
   return ids.includes(String(ctx.from?.id));
 }
 
@@ -48,8 +55,7 @@ async function visibleChannels(ctx, store) {
   return results.filter(Boolean);
 }
 
-const menu = {
-  reply_markup: { inline_keyboard: [
+const menuRows = [
     [
       { text: '📢 CANALES', callback_data: 'admin:channels' },
       { text: '📝 PLANTILLAS', callback_data: 'admin:templates' },
@@ -75,8 +81,19 @@ const menu = {
       { text: '🔀 DISTRIBUCIÓN', callback_data: 'admin:distribution' },
       { text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }
     ]
-  ]}
-};
+  ];
+
+function adminMenu(ctx) {
+  const rows = menuRows.map(row => row.slice());
+  if (!rootAllowed(ctx)) {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const filtered = rows[i].filter(button => button.callback_data !== 'admin:admins');
+      if (filtered.length) rows[i] = filtered;
+      else rows.splice(i, 1);
+    }
+  }
+  return { reply_markup: { inline_keyboard: rows } };
+}
 
 const TYPES = [
   ['text', '💬 TEXTO'], ['photo', '🖼️ FOTO'], ['video', '🎬 VIDEO'],
@@ -256,7 +273,7 @@ export function registerAdmin(bot, store) {
   bot.command('admin', async ctx => {
     if (!allowed(ctx)) return ctx.reply('⛔ Sin permiso.');
     clearSession(ctx);
-    return ctx.reply('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
+    return ctx.reply('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', adminMenu(ctx));
   });
 
   bot.command('cancel', async (ctx, next) => {
@@ -268,7 +285,7 @@ export function registerAdmin(bot, store) {
   bot.action('admin:home', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     clearSession(ctx);
-    await ctx.editMessageText('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', menu);
+    await ctx.editMessageText('⚙️ PANEL DE ADMINISTRACIÓN\n\nSelecciona una sección:', adminMenu(ctx));
     await ctx.answerCbQuery();
   });
 
@@ -583,7 +600,7 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action('admin:admins', async ctx => {
-    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo el propietario del bot puede ver y gestionar administradores.');
     const roots = rootAdminIds();
     const extras = Array.isArray(store.global.adminIds) ? store.global.adminIds.map(String) : [];
     const lines = [
@@ -604,7 +621,7 @@ export function registerAdmin(bot, store) {
   });
 
   bot.action('admin:addadmin', async ctx => {
-    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo un administrador principal puede cambiar la lista.');
+    if (!rootAllowed(ctx)) return ctx.answerCbQuery('Solo el propietario del bot puede cambiar la lista.');
     setSession(ctx, { action: 'addadmin' });
     await ctx.answerCbQuery();
     await ctx.reply('👥 AÑADIR ADMINISTRADOR\n\nEnvíame el ID numérico de Telegram del nuevo administrador.\n\n/cancel para cancelar.');
@@ -768,7 +785,7 @@ export function registerAdmin(bot, store) {
     if (s.action === 'addadmin') {
       const id = ctx.message.text.trim();
       if (!/^\d+$/.test(id)) return ctx.reply('❌ El ID debe ser numérico. Inténtalo de nuevo o usa /cancel.');
-      if (rootAdminIds().includes(id) || store.global.adminIds.map(String).includes(id)) {
+      if (rootAdminIds().includes(id) || configuredAdminIds().includes(id) || store.global.adminIds.map(String).includes(id)) {
         clearSession(ctx);
         return ctx.reply('ℹ️ Ese ID ya tiene permisos de administrador.');
       }
