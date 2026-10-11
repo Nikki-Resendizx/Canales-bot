@@ -522,11 +522,10 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
     await ctx.reply(
       '🚫 BANEO GLOBAL\n\n' +
-      'Envía USER_ID y USERNAME separados por una barra vertical.\n' +
-      'Ejemplo: 5389683864 | @usuario\n' +
-      'Si la cuenta no tiene username, escribe: 5389683864 | sin_username\n\n' +
-      'USER_ID es el dato que Telegram necesita para aplicar el baneo; USERNAME se guardará como referencia para identificar la cuenta.\n' +
-      'La acción se aplicará a los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
+      'Envía SOLO uno de estos datos: USER_ID numérico o USERNAME (@usuario).\n' +
+      'Ejemplos: 5389683864  ó  @usuario\n\n' +
+      'Si envías USERNAME, el bot solo podrá usarlo si ya conoce esa cuenta por una actualización de Telegram. Si no puede resolverlo, te pedirá el USER_ID.\n' +
+      'El baneo se intentará en los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
       '/cancel para cancelar.'
     );
     setSession(ctx, { action: 'globalban' });
@@ -893,18 +892,28 @@ export function registerAdmin(bot, store) {
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
 
     if (s.action === 'globalban') {
-      const parts = ctx.message.text.split('|').map(value => value.trim());
-      const targetId = parts[0] || '';
-      const rawUsername = parts[1] || '';
-      const targetUsername = rawUsername.toLowerCase() === 'sin_username' || rawUsername === '—'
-        ? ''
-        : rawUsername.replace(/^@/, '');
-      if (!/^\d+$/.test(targetId) || parts.length < 2) {
-        return ctx.reply('❌ Formato incorrecto. Envía: USER_ID | USERNAME\nEjemplo: 5389683864 | @usuario\nSi no tiene username: 5389683864 | sin_username');
+      const raw = ctx.message.text.trim();
+      let targetId = '';
+      let targetUsername = '';
+      if (/^\d+$/.test(raw)) {
+        targetId = raw;
+        targetUsername = String(store.global.globalBanUsernames?.[targetId] || '');
+      } else {
+        targetUsername = raw.replace(/^@/, '');
+        if (!/^[A-Za-z0-9_]{5,32}$/.test(targetUsername)) {
+          return ctx.reply('❌ Envía solo un USER_ID numérico o un USERNAME válido como @usuario.');
+        }
+        const directory = store.global.userDirectory && typeof store.global.userDirectory === 'object'
+          ? store.global.userDirectory : {};
+        const match = Object.entries(directory).find(([username]) => username.toLowerCase() === targetUsername.toLowerCase());
+        if (!match) {
+          return ctx.reply('⚠️ No encuentro el ID de @' + targetUsername + ' en los datos que el bot conoce. Telegram no permite resolver cualquier @username de usuario directamente para banearlo.\n\nEnvía su USER_ID numérico para continuar, o usa un username de una cuenta que el bot ya haya visto.');
+        }
+        targetId = String(match[1]);
+        targetUsername = String(match[0]);
       }
-      if (targetUsername && !/^[A-Za-z0-9_]{5,32}$/.test(targetUsername)) {
-        return ctx.reply('❌ USERNAME no válido. Escribe el @username sin espacios o usa sin_username.');
-      }
+      if (!/^\d+$/.test(targetId)) return ctx.reply('❌ No pude identificar el USER_ID. Envía el ID numérico.');
+
       if (targetId === String(ctx.from.id)) {
         return ctx.reply('❌ No puedes aplicar el baneo global a tu propia cuenta.');
       }
