@@ -77,6 +77,9 @@ const menuRows = [
       { text: '🚨 ALERTAS', callback_data: 'admin:alerts' }
     ],
     [
+      { text: '🚫 BANEO GLOBAL', callback_data: 'admin:globalban' }
+    ],
+    [
       { text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' },
       { text: '🔀 DISTRIBUCIÓN', callback_data: 'admin:distribution' },
       { text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }
@@ -512,6 +515,81 @@ export function registerAdmin(bot, store) {
     await ctx.editMessageText('🔘 BOTONES — ' + (c.title || c.id) + '\n\nNo hay botones configurados.', buttonKeyboard(c)); await ctx.answerCbQuery('Botones eliminados');
   });
 
+  bot.action('admin:globalban', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      '🚫 BANEO GLOBAL\n\n' +
+      'Escribe el ID numérico de Telegram del usuario que quieres banear.\n' +
+      'La acción se aplicará una sola vez a todos los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
+      'No se puede buscar un usuario solo por @username desde la API del bot.\n' +
+      '/cancel para cancelar.'
+    );
+    setSession(ctx, { action: 'globalban' });
+  });
+
+  bot.action('globalban:cancel', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const s = getSession(ctx);
+    if (!s || !['globalban', 'globalbanconfirm'].includes(s.action)) {
+      return ctx.answerCbQuery('Esta operación ya no está activa.');
+    }
+    clearSession(ctx);
+    await ctx.answerCbQuery('Baneo cancelado');
+    try {
+      await ctx.editMessageText('❌ Baneo global cancelado.', {
+        reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] }
+      });
+    } catch {}
+  });
+
+  bot.action('globalban:confirm', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const s = getSession(ctx);
+    if (!s || s.action !== 'globalbanconfirm' || !/^\\d+$/.test(String(s.targetId || ''))) {
+      return ctx.answerCbQuery('La confirmación expiró. Inicia de nuevo desde /admin.');
+    }
+    const targetId = String(s.targetId);
+    await ctx.answerCbQuery('Procesando baneo global…');
+    const me = await ctx.telegram.getMe();
+    const eligible = [];
+    for (const channel of Object.values(store.channels || {})) {
+      if (!(await userIsChannelAdmin(ctx, channel.id))) continue;
+      try {
+        const botMember = await ctx.telegram.getChatMember(channel.id, me.id);
+        if (botMember?.status === 'administrator' && botMember.can_restrict_members === true) {
+          eligible.push(channel);
+        }
+      } catch (err) {
+        console.warn('[GLOBAL BAN PERMISSIONS]', channel.id, err.description || err.message);
+      }
+    }
+
+    let success = 0;
+    const failures = [];
+    for (const channel of eligible) {
+      try {
+        await ctx.telegram.banChatMember(channel.id, Number(targetId));
+        success++;
+      } catch (err) {
+        failures.push((channel.title || channel.id) + ': ' + String(err.description || err.message || 'Error').slice(0, 160));
+      }
+    }
+    clearSession(ctx);
+    saveStore(store);
+    const summary = '🚫 RESULTADO DEL BANEO GLOBAL\n\n' +
+      '👤 Usuario ID: ' + targetId +
+      '\n✅ Baneos aplicados: ' + success +
+      '\n❌ Canales con error: ' + failures.length +
+      '\n📢 Canales revisados con permisos: ' + eligible.length +
+      (eligible.length === 0 ? '\n\nNo encontré canales donde tú seas administrador y el bot tenga permiso «Restringir miembros».' : '') +
+      (failures.length ? '\n\nDetalles:\n' + failures.slice(0, 10).map(item => '• ' + item).join('\n') : '');
+    await ctx.editMessageText(summary, {
+      reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] }
+    });
+  });
+
   bot.action('admin:publish', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     await ctx.answerCbQuery();
@@ -803,6 +881,51 @@ export function registerAdmin(bot, store) {
     if (!s) return next();
 
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
+
+    if (s.action === 'globalban') {
+      const targetId = ctx.message.text.trim();
+      if (!/^\\d+$/.test(targetId)) {
+        return ctx.reply('❌ Envíame únicamente el ID numérico de Telegram del usuario. Usa /cancel para cancelar.');
+      }
+      if (targetId === String(ctx.from.id)) {
+        return ctx.reply('❌ No puedes aplicar el baneo global a tu propia cuenta.');
+      }
+      if (rootAdminIds().includes(targetId) || configuredAdminIds().includes(targetId) ||
+          (Array.isArray(store.global.adminIds) && store.global.adminIds.map(String).includes(targetId))) {
+        return ctx.reply('⛔ Ese usuario es administrador del bot. No se realizará el baneo global.');
+      }
+
+      const me = await ctx.telegram.getMe();
+      const eligible = [];
+      for (const channel of Object.values(store.channels || {})) {
+        if (!(await userIsChannelAdmin(ctx, channel.id))) continue;
+        try {
+          const botMember = await ctx.telegram.getChatMember(channel.id, me.id);
+          if (botMember?.status === 'administrator' && botMember.can_restrict_members === true) eligible.push(channel);
+        } catch (err) {
+          console.warn('[GLOBAL BAN CHECK]', channel.id, err.description || err.message);
+        }
+      }
+      if (!eligible.length) {
+        clearSession(ctx);
+        return ctx.reply('❌ No encontré canales registrados donde tú seas administrador y el bot tenga el permiso «Restringir miembros».\n\nActiva ese permiso para el bot en los canales y vuelve a intentarlo.');
+      }
+
+      setSession(ctx, { action: 'globalbanconfirm', targetId });
+      const channelLines = eligible.slice(0, 20).map(channel => '• ' + (channel.title || channel.id));
+      return ctx.reply(
+        '⚠️ CONFIRMAR BANEO GLOBAL\n\n' +
+        '👤 Usuario ID: ' + targetId +
+        '\n📢 Canales donde se intentará aplicar: ' + eligible.length +
+        '\n\n' + channelLines.join('\n') +
+        (eligible.length > 20 ? '\n• … y ' + (eligible.length - 20) + ' más' : '') +
+        '\n\nEl usuario será baneado de todos los canales de esta lista. ¿Continuar?',
+        { reply_markup: { inline_keyboard: [
+          [{ text: '🚫 SÍ, BANEAR EN TODOS', callback_data: 'globalban:confirm' }],
+          [{ text: '❌ CANCELAR', callback_data: 'globalban:cancel' }]
+        ] } }
+      );
+    }
 
     if (s.action === 'addadmin') {
       if (!rootAllowed(ctx)) { clearSession(ctx); return ctx.reply('⛔ Solo el propietario del bot puede agregar administradores.'); }
