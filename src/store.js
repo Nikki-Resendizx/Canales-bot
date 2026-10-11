@@ -32,6 +32,7 @@ function emptyStore() {
       normalize: true,
       adminIds: [],
       globalBans: [],
+      globalBanUsernames: {},
       distributionRoutes: []
     }
   };
@@ -70,6 +71,9 @@ export function createStore() {
       formats: { ...base.global.formats, ...(parsed.global?.formats || {}) },
       adminIds: Array.isArray(parsed.global?.adminIds) ? parsed.global.adminIds.map(String) : [],
       globalBans: Array.isArray(parsed.global?.globalBans) ? parsed.global.globalBans.filter(id => /^\d+$/.test(String(id))).map(String) : [],
+      globalBanUsernames: parsed.global?.globalBanUsernames && typeof parsed.global.globalBanUsernames === 'object' && !Array.isArray(parsed.global.globalBanUsernames)
+        ? Object.fromEntries(Object.entries(parsed.global.globalBanUsernames).filter(([id, username]) => /^\d+$/.test(id) && (username === '' || /^[A-Za-z0-9_]{5,32}$/.test(String(username)))).map(([id, username]) => [id, String(username)]))
+        : {},
       distributionRoutes: Array.isArray(parsed.global?.distributionRoutes) ? parsed.global.distributionRoutes.filter(route => route && typeof route === 'object' && route.id && route.sourceId && route.targetId && ['forward', 'copy'].includes(route.mode)).map(route => ({ ...route, sourceId: String(route.sourceId), targetId: String(route.targetId), ownerId: String(route.ownerId || ''), enabled: route.enabled !== false })) : []
     };
     const channels = parsed.channels || {};
