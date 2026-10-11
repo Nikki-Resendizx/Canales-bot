@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Telegraf } from 'telegraf';
-import { createStore, recordAlert } from './store.js';
+import { createStore, recordAlert, saveStore } from './store.js';
 import { registerAdmin } from './admin.js';
 import { registerPosts } from './posts.js';
 import { registerPayments } from './payments.js';
@@ -52,6 +52,11 @@ bot.command('help', ctx => ctx.reply(
   'Los comandos /refund y /retrydelivery están reservados a administradores.'
 ));
 
+function saveDirectorySafely() {
+  try { saveStore(store); }
+  catch (err) { console.warn('[USER DIRECTORY SAVE]', err.message); }
+}
+
 // Reintenta hacer efectivo el baneo global cuando Telegram ya reconoce al usuario
 // por un intento de entrada o por una actualización de miembro.
 async function enforceGlobalBan(chatId, userId, eventType) {
@@ -79,7 +84,13 @@ bot.on('chat_member', async ctx => {
   if (!update) return;
   const chatId = update.chat?.id;
   const member = update.new_chat_member;
-  const userId = member?.user?.id;
+  const user = member?.user;
+  const userId = user?.id;
+  if (userId && user?.username && /^[A-Za-z0-9_]{5,32}$/.test(user.username)) {
+    if (!store.global.userDirectory || typeof store.global.userDirectory !== 'object') store.global.userDirectory = {};
+    store.global.userDirectory[user.username.toLowerCase()] = String(userId);
+    saveDirectorySafely();
+  }
   if (!userId || ['left', 'kicked'].includes(member?.status)) return;
   await enforceGlobalBan(chatId, userId, 'chat_member');
 });
@@ -88,7 +99,13 @@ bot.on('chat_join_request', async ctx => {
   const request = ctx.update.chat_join_request;
   if (!request) return;
   const chatId = request.chat?.id;
-  const userId = request.from?.id;
+  const user = request.from;
+  const userId = user?.id;
+  if (userId && user?.username && /^[A-Za-z0-9_]{5,32}$/.test(user.username)) {
+    if (!store.global.userDirectory || typeof store.global.userDirectory !== 'object') store.global.userDirectory = {};
+    store.global.userDirectory[user.username.toLowerCase()] = String(userId);
+    saveDirectorySafely();
+  }
   const id = String(userId || '');
   const bannedIds = Array.isArray(store.global.globalBans) ? store.global.globalBans.map(String) : [];
   if (!bannedIds.includes(id) || !store.channels[String(chatId)]) return;
