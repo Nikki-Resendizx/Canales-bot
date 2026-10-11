@@ -548,7 +548,7 @@ export function registerAdmin(bot, store) {
   bot.action('globalban:confirm', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const s = getSession(ctx);
-    if (!s || s.action !== 'globalbanconfirm' || !/^\\d+$/.test(String(s.targetId || ''))) {
+    if (!s || s.action !== 'globalbanconfirm' || !/^\d+$/.test(String(s.targetId || ''))) {
       return ctx.answerCbQuery('La confirmación expiró. Inicia de nuevo desde /admin.');
     }
     const targetId = String(s.targetId);
@@ -885,7 +885,7 @@ export function registerAdmin(bot, store) {
 
     if (s.action === 'globalban') {
       const targetId = ctx.message.text.trim();
-      if (!/^\\d+$/.test(targetId)) {
+      if (!/^\d+$/.test(targetId)) {
         return ctx.reply('❌ Envíame únicamente el ID numérico de Telegram del usuario. Usa /cancel para cancelar.');
       }
       if (targetId === String(ctx.from.id)) {
