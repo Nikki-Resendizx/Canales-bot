@@ -128,7 +128,8 @@ function addChannelKeyboard() {
             can_manage_chat: true,
             can_post_messages: true,
             can_edit_messages: true,
-            can_delete_messages: true
+            can_delete_messages: true,
+            can_restrict_members: true
           },
           request_title: true,
           request_username: true,
