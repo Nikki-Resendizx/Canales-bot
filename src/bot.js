@@ -57,7 +57,7 @@ bot.command('help', ctx => ctx.reply(
 async function enforceGlobalBan(chatId, userId, eventType) {
   const id = String(userId || '');
   const channelId = String(chatId || '');
-  if (!/^\\d+$/.test(id) || !store.channels[channelId]) return;
+  if (!/^\d+$/.test(id) || !store.channels[channelId]) return;
   const bannedIds = Array.isArray(store.global.globalBans) ? store.global.globalBans.map(String) : [];
   if (!bannedIds.includes(id)) return;
   try {
