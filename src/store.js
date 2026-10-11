@@ -33,6 +33,7 @@ function emptyStore() {
       adminIds: [],
       globalBans: [],
       globalBanUsernames: {},
+      userDirectory: {},
       distributionRoutes: []
     }
   };
@@ -73,6 +74,9 @@ export function createStore() {
       globalBans: Array.isArray(parsed.global?.globalBans) ? parsed.global.globalBans.filter(id => /^\d+$/.test(String(id))).map(String) : [],
       globalBanUsernames: parsed.global?.globalBanUsernames && typeof parsed.global.globalBanUsernames === 'object' && !Array.isArray(parsed.global.globalBanUsernames)
         ? Object.fromEntries(Object.entries(parsed.global.globalBanUsernames).filter(([id, username]) => /^\d+$/.test(id) && (username === '' || /^[A-Za-z0-9_]{5,32}$/.test(String(username)))).map(([id, username]) => [id, String(username)]))
+        : {},
+      userDirectory: parsed.global?.userDirectory && typeof parsed.global.userDirectory === 'object' && !Array.isArray(parsed.global.userDirectory)
+        ? Object.fromEntries(Object.entries(parsed.global.userDirectory).filter(([username, id]) => /^[A-Za-z0-9_]{5,32}$/.test(username) && /^\d+$/.test(String(id))).map(([username, id]) => [username.toLowerCase(), String(id)]))
         : {},
       distributionRoutes: Array.isArray(parsed.global?.distributionRoutes) ? parsed.global.distributionRoutes.filter(route => route && typeof route === 'object' && route.id && route.sourceId && route.targetId && ['forward', 'copy'].includes(route.mode)).map(route => ({ ...route, sourceId: String(route.sourceId), targetId: String(route.targetId), ownerId: String(route.ownerId || ''), enabled: route.enabled !== false })) : []
     };
