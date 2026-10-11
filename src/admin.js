@@ -586,13 +586,15 @@ export function registerAdmin(bot, store) {
     }
     clearSession(ctx);
     saveStore(store);
+    const participantInvalid = failures.filter(item => item.includes('PARTICIPANT_ID_INVALID')).length;
     const summary = '🚫 RESULTADO DEL BANEO GLOBAL\n\n' +
-      '🆔 USER_ID: ' + targetId +
-      '\n👤 USERNAME: ' + (targetUsername ? '@' + targetUsername : 'sin username') +
-      '\n✅ Baneos aplicados: ' + success +
+      '🆔 USER_ID utilizado para el baneo: ' + targetId +
+      '\n👤 USERNAME de referencia: ' + (targetUsername ? '@' + targetUsername : 'no disponible') +
+      '\n✅ Baneos aplicados directamente: ' + success +
       '\n❌ Canales con error: ' + failures.length +
       '\n📢 Canales revisados con permisos: ' + eligible.length +
       (eligible.length === 0 ? '\n\nNo encontré canales donde tú seas administrador y el bot tenga permiso «Restringir miembros».' : '') +
+      (participantInvalid ? '\n\n⚠️ Telegram no reconoce a este usuario como participante en ' + participantInvalid + ' canal(es). El bot ya guardó el USER_ID en la lista de baneo global, pero la Bot API no permite banear por @username directamente ni garantiza banear cuentas que nunca han participado. Si la cuenta intenta entrar o solicita acceso, el bot volverá a intentar bloquearla.' : '') +
       (failures.length ? '\n\nDetalles:\n' + failures.slice(0, 10).map(item => '• ' + item).join('\n') : '');
     await ctx.editMessageText(summary, {
       reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] }
