@@ -52,12 +52,61 @@ bot.command('help', ctx => ctx.reply(
   'Los comandos /refund y /retrydelivery están reservados a administradores.'
 ));
 
+// Reintenta hacer efectivo el baneo global cuando Telegram ya reconoce al usuario
+// por un intento de entrada o por una actualización de miembro.
+async function enforceGlobalBan(chatId, userId, eventType) {
+  const id = String(userId || '');
+  const channelId = String(chatId || '');
+  if (!/^\\d+$/.test(id) || !store.channels[channelId]) return;
+  const bannedIds = Array.isArray(store.global.globalBans) ? store.global.globalBans.map(String) : [];
+  if (!bannedIds.includes(id)) return;
+  try {
+    const me = await bot.telegram.getMe();
+    const botMember = await bot.telegram.getChatMember(channelId, me.id);
+    if (botMember?.status !== 'administrator' || botMember.can_restrict_members !== true) {
+      console.warn('[GLOBAL BAN ENFORCEMENT] Missing ban permission:', channelId, id);
+      return;
+    }
+    await bot.telegram.banChatMember(channelId, Number(id));
+    console.log('[GLOBAL BAN ENFORCEMENT] Ban applied:', channelId, id, eventType);
+  } catch (err) {
+    console.warn('[GLOBAL BAN ENFORCEMENT]', channelId, id, err.description || err.message);
+  }
+}
+
+bot.on('chat_member', async ctx => {
+  const update = ctx.update.chat_member;
+  if (!update) return;
+  const chatId = update.chat?.id;
+  const member = update.new_chat_member;
+  const userId = member?.user?.id;
+  if (!userId || ['left', 'kicked'].includes(member?.status)) return;
+  await enforceGlobalBan(chatId, userId, 'chat_member');
+});
+
+bot.on('chat_join_request', async ctx => {
+  const request = ctx.update.chat_join_request;
+  if (!request) return;
+  const chatId = request.chat?.id;
+  const userId = request.from?.id;
+  const id = String(userId || '');
+  const bannedIds = Array.isArray(store.global.globalBans) ? store.global.globalBans.map(String) : [];
+  if (!bannedIds.includes(id) || !store.channels[String(chatId)]) return;
+  try {
+    await ctx.telegram.declineChatJoinRequest(chatId, Number(id));
+    console.log('[GLOBAL BAN ENFORCEMENT] Join request declined:', chatId, id);
+  } catch (err) {
+    console.warn('[GLOBAL BAN JOIN REQUEST]', chatId, id, err.description || err.message);
+  }
+  await enforceGlobalBan(chatId, userId, 'chat_join_request');
+});
+
 bot.on('callback_query', async (ctx, next) => {
   if (!ctx.callbackQuery?.data) return next();
   await ctx.answerCbQuery('Este botón no tiene una acción configurada.');
 });
 
-bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'pre_checkout_query'] })
+bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'chat_member', 'chat_join_request', 'pre_checkout_query'] })
   .then(() => console.log('🤖 Canales-bot iniciado.'))
   .catch(err => {
     console.error('[LAUNCH ERROR]', err.description || err.message);
