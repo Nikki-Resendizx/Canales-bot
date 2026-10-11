@@ -522,9 +522,11 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
     await ctx.reply(
       '🚫 BANEO GLOBAL\n\n' +
-      'Escribe el ID numérico de Telegram del usuario que quieres banear.\n' +
-      'La acción se aplicará una sola vez a todos los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
-      'No se puede buscar un usuario solo por @username desde la API del bot.\n' +
+      'Envía USER_ID y USERNAME separados por una barra vertical.\n' +
+      'Ejemplo: 5389683864 | @usuario\n' +
+      'Si la cuenta no tiene username, escribe: 5389683864 | sin_username\n\n' +
+      'USER_ID es el dato que Telegram necesita para aplicar el baneo; USERNAME se guardará como referencia para identificar la cuenta.\n' +
+      'La acción se aplicará a los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
       '/cancel para cancelar.'
     );
     setSession(ctx, { action: 'globalban' });
@@ -552,8 +554,11 @@ export function registerAdmin(bot, store) {
       return ctx.answerCbQuery('La confirmación expiró. Inicia de nuevo desde /admin.');
     }
     const targetId = String(s.targetId);
+    const targetUsername = String(s.targetUsername || '').replace(/^@/, '');
     if (!Array.isArray(store.global.globalBans)) store.global.globalBans = [];
     if (!store.global.globalBans.map(String).includes(targetId)) store.global.globalBans.push(targetId);
+    if (!store.global.globalBanUsernames || typeof store.global.globalBanUsernames !== 'object') store.global.globalBanUsernames = {};
+    store.global.globalBanUsernames[targetId] = targetUsername;
     saveStore(store);
     await ctx.answerCbQuery('Registrando baneo global…');
     const me = await ctx.telegram.getMe();
@@ -583,7 +588,8 @@ export function registerAdmin(bot, store) {
     clearSession(ctx);
     saveStore(store);
     const summary = '🚫 RESULTADO DEL BANEO GLOBAL\n\n' +
-      '👤 Usuario ID: ' + targetId +
+      '🆔 USER_ID: ' + targetId +
+      '\n👤 USERNAME: ' + (targetUsername ? '@' + targetUsername : 'sin username') +
       '\n✅ Baneos aplicados: ' + success +
       '\n❌ Canales con error: ' + failures.length +
       '\n📢 Canales revisados con permisos: ' + eligible.length +
@@ -887,9 +893,17 @@ export function registerAdmin(bot, store) {
     if (s.action === 'addchannel') return addChannelFromId(ctx, store, ctx.message.text);
 
     if (s.action === 'globalban') {
-      const targetId = ctx.message.text.trim();
-      if (!/^\d+$/.test(targetId)) {
-        return ctx.reply('❌ Envíame únicamente el ID numérico de Telegram del usuario. Usa /cancel para cancelar.');
+      const parts = ctx.message.text.split('|').map(value => value.trim());
+      const targetId = parts[0] || '';
+      const rawUsername = parts[1] || '';
+      const targetUsername = rawUsername.toLowerCase() === 'sin_username' || rawUsername === '—'
+        ? ''
+        : rawUsername.replace(/^@/, '');
+      if (!/^\d+$/.test(targetId) || parts.length < 2) {
+        return ctx.reply('❌ Formato incorrecto. Envía: USER_ID | USERNAME\nEjemplo: 5389683864 | @usuario\nSi no tiene username: 5389683864 | sin_username');
+      }
+      if (targetUsername && !/^[A-Za-z0-9_]{5,32}$/.test(targetUsername)) {
+        return ctx.reply('❌ USERNAME no válido. Escribe el @username sin espacios o usa sin_username.');
       }
       if (targetId === String(ctx.from.id)) {
         return ctx.reply('❌ No puedes aplicar el baneo global a tu propia cuenta.');
@@ -915,11 +929,12 @@ export function registerAdmin(bot, store) {
         return ctx.reply('❌ No encontré canales registrados donde tú seas administrador y el bot tenga el permiso «Restringir miembros».\n\nActiva ese permiso para el bot en los canales y vuelve a intentarlo.');
       }
 
-      setSession(ctx, { action: 'globalbanconfirm', targetId });
+      setSession(ctx, { action: 'globalbanconfirm', targetId, targetUsername });
       const channelLines = eligible.slice(0, 20).map(channel => '• ' + (channel.title || channel.id));
       return ctx.reply(
         '⚠️ CONFIRMAR BANEO GLOBAL\n\n' +
-        '👤 Usuario ID: ' + targetId +
+        '🆔 USER_ID: ' + targetId +
+        '\n👤 USERNAME: ' + (targetUsername ? '@' + targetUsername : 'sin username') +
         '\n📢 Canales donde se intentará aplicar: ' + eligible.length +
         '\n\n' + channelLines.join('\n') +
         (eligible.length > 20 ? '\n• … y ' + (eligible.length - 20) + ' más' : '') +
