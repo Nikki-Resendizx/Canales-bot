@@ -552,7 +552,10 @@ export function registerAdmin(bot, store) {
       return ctx.answerCbQuery('La confirmación expiró. Inicia de nuevo desde /admin.');
     }
     const targetId = String(s.targetId);
-    await ctx.answerCbQuery('Procesando baneo global…');
+    if (!Array.isArray(store.global.globalBans)) store.global.globalBans = [];
+    if (!store.global.globalBans.map(String).includes(targetId)) store.global.globalBans.push(targetId);
+    saveStore(store);
+    await ctx.answerCbQuery('Registrando baneo global…');
     const me = await ctx.telegram.getMe();
     const eligible = [];
     for (const channel of Object.values(store.channels || {})) {
