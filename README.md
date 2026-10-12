@@ -70,3 +70,14 @@ La configuración se guarda en `data/channels.json`, ignorado por Git. Este arch
 - El editor automático no puede garantizar que todo contenido se edite: Telegram puede rechazar mensajes sin permisos, con entidades inválidas o que no admitan edición.
 - Los botones `callback` personalizados muestran una respuesta genérica si no tienen una acción programada; los botones URL sí abren su destino.
 - El bot no incluye un módulo de modelos ni WebApp.
+
+
+## Avisos de reacciones
+
+- El canal privado de avisos predeterminado es `-1004456932813`. El bot debe ser administrador de ese canal y poder publicar mensajes.
+- Para cambiar el destino, configura `REACTION_ALERTS_CHAT_ID` en el hosting. `REACTION_ALERTS_ENABLED=false` desactiva los avisos.
+- El bot debe ser administrador de cada canal de origen vigilado.
+- `src/bot.js` solicita explícitamente las actualizaciones `message_reaction` y `message_reaction_count`.
+- Cuando Telegram proporciona una identidad, el aviso incluye nombre con mención, username si existe, ID, reacción y enlace a la publicación. Las reacciones de emoji personalizado intentan mostrarse con `tg-emoji`.
+- Las actualizaciones de conteo no revelan las identidades de las personas. El bot guarda conteos recientes (hasta 500 publicaciones) y envía avisos agregados sin atribuirlos a usuarios.
+- No se recupera el historial anterior a la activación y Telegram puede no enviar identidad para determinadas reacciones. El módulo solo puede informar lo que la Bot API entregue.
