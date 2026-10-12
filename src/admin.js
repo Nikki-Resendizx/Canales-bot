@@ -643,10 +643,10 @@ export function registerAdmin(bot, store) {
       '',
       'Los avisos individuales solo incluyen usuarios cuando Telegram los identifica. Los conteos anónimos se muestran sin atribuirlos a personas.',
       '',
-      channelLines.length ? channelLines.join('\\n') : 'No hay canales registrados donde seas administrador.',
+      channelLines.length ? channelLines.join('\n') : 'No hay canales registrados donde seas administrador.',
       '',
       'Nota: los conteos se guardan desde que el bot recibe estas actualizaciones; no recupera automáticamente el historial anterior.'
-    ].join('\\n');
+    ].join('\n');
     await ctx.answerCbQuery();
     await ctx.editMessageText(body, { reply_markup: { inline_keyboard: [
       [{ text: '🔄 ACTUALIZAR', callback_data: 'admin:reactions' }],
