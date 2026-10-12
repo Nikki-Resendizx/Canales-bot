@@ -34,7 +34,10 @@ function emptyStore() {
       globalBans: [],
       globalBanUsernames: {},
       userDirectory: {},
-      distributionRoutes: []
+      distributionRoutes: [],
+      reactionAlertsChatId: '-1004456932813',
+      reactionAlertsEnabled: true,
+      reactionCounts: {}
     }
   };
 }
@@ -78,7 +81,10 @@ export function createStore() {
       userDirectory: parsed.global?.userDirectory && typeof parsed.global.userDirectory === 'object' && !Array.isArray(parsed.global.userDirectory)
         ? Object.fromEntries(Object.entries(parsed.global.userDirectory).filter(([username, id]) => /^[A-Za-z0-9_]{5,32}$/.test(username) && /^\d+$/.test(String(id))).map(([username, id]) => [username.toLowerCase(), String(id)]))
         : {},
-      distributionRoutes: Array.isArray(parsed.global?.distributionRoutes) ? parsed.global.distributionRoutes.filter(route => route && typeof route === 'object' && route.id && route.sourceId && route.targetId && ['forward', 'copy'].includes(route.mode)).map(route => ({ ...route, sourceId: String(route.sourceId), targetId: String(route.targetId), ownerId: String(route.ownerId || ''), enabled: route.enabled !== false })) : []
+      distributionRoutes: Array.isArray(parsed.global?.distributionRoutes) ? parsed.global.distributionRoutes.filter(route => route && typeof route === 'object' && route.id && route.sourceId && route.targetId && ['forward', 'copy'].includes(route.mode)).map(route => ({ ...route, sourceId: String(route.sourceId), targetId: String(route.targetId), ownerId: String(route.ownerId || ''), enabled: route.enabled !== false })) : [],
+      reactionAlertsChatId: /^-100\\d{5,}$/.test(String(parsed.global?.reactionAlertsChatId || '')) ? String(parsed.global.reactionAlertsChatId) : base.global.reactionAlertsChatId,
+      reactionAlertsEnabled: parsed.global?.reactionAlertsEnabled !== false,
+      reactionCounts: parsed.global?.reactionCounts && typeof parsed.global.reactionCounts === 'object' && !Array.isArray(parsed.global.reactionCounts) ? parsed.global.reactionCounts : {}
     };
     const channels = parsed.channels || {};
     const publications = parsed.publications || {};
