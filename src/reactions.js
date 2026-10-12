@@ -164,13 +164,13 @@ export function registerReactions(bot, store) {
     const link = publicationLink(update.chat, update.message_id);
     const summaryHtml = counts.length
       ? counts.map(item => {
-          if (item.type === 'custom_emoji' && /^\\d+$/.test(String(item.customEmojiId))) {
+          if (item.type === 'custom_emoji' && /^\d+$/.test(String(item.customEmojiId))) {
             return '<tg-emoji emoji-id="' + String(item.customEmojiId) + '">✨</tg-emoji>: ' + Number(item.count || 0);
           }
           if (item.type === 'emoji' && item.emoji) return escapeHtml(item.emoji) + ': ' + Number(item.count || 0);
           if (item.type === 'paid') return '⭐ Reacciones de pago: ' + Number(item.count || 0);
           return 'Reacción: ' + Number(item.count || 0);
-        }).join('\\n')
+        }).join('\n')
       : 'No hay conteos de reacciones disponibles.';
     const summaryPlain = counts.length
       ? counts.map(item => {
@@ -178,7 +178,7 @@ export function registerReactions(bot, store) {
           if (item.type === 'emoji' && item.emoji) return item.emoji + ': ' + Number(item.count || 0);
           if (item.type === 'paid') return '⭐ Reacciones de pago: ' + Number(item.count || 0);
           return 'Reacción: ' + Number(item.count || 0);
-        }).join('\\n')
+        }).join('\n')
       : 'No hay conteos de reacciones disponibles.';
 
     const html = [
@@ -187,14 +187,14 @@ export function registerReactions(bot, store) {
       '🔗 <b>Publicación:</b> ' + (link ? '<a href="' + escapeHtml(link) + '">Abrir publicación</a>' : 'Enlace no disponible'),
       '',
       summaryHtml
-    ].join('\\n');
+    ].join('\n');
     const fallback = [
       '📊 CONTEO DE REACCIONES ACTUALIZADO',
       '📢 Canal: ' + (channel.title || update.chat.title || 'Canal'),
       '🔗 Publicación: ' + (link || 'Enlace no disponible'),
       '',
       summaryPlain
-    ].join('\\n');
+    ].join('\n');
 
     try {
       await sendHtmlWithFallback(ctx.telegram, destinationChatId(store), html, fallback);
