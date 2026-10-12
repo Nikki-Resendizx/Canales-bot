@@ -162,15 +162,23 @@ export function registerReactions(bot, store) {
     // Count updates do not identify the people behind anonymous reactions.
     // Send aggregate data only; never infer a user from a count change.
     const link = publicationLink(update.chat, update.message_id);
-    const summary = counts.length
+    const summaryHtml = counts.length
       ? counts.map(item => {
-          if (item.type === 'custom_emoji' && /^\d+$/.test(String(item.customEmojiId))) {
-            return '✨ Emoji personalizado (' + item.customEmojiId + '): ' + item.count;
+          if (item.type === 'custom_emoji' && /^\\d+$/.test(String(item.customEmojiId))) {
+            return '<tg-emoji emoji-id="' + String(item.customEmojiId) + '">✨</tg-emoji>: ' + Number(item.count || 0);
           }
-          if (item.type === 'emoji' && item.emoji) return item.emoji + ': ' + item.count;
-          if (item.type === 'paid') return '⭐ Reacciones de pago: ' + item.count;
-          return 'Reacción: ' + item.count;
-        }).join('\n')
+          if (item.type === 'emoji' && item.emoji) return escapeHtml(item.emoji) + ': ' + Number(item.count || 0);
+          if (item.type === 'paid') return '⭐ Reacciones de pago: ' + Number(item.count || 0);
+          return 'Reacción: ' + Number(item.count || 0);
+        }).join('\\n')
+      : 'No hay conteos de reacciones disponibles.';
+    const summaryPlain = counts.length
+      ? counts.map(item => {
+          if (item.type === 'custom_emoji') return '✨ Emoji personalizado: ' + Number(item.count || 0);
+          if (item.type === 'emoji' && item.emoji) return item.emoji + ': ' + Number(item.count || 0);
+          if (item.type === 'paid') return '⭐ Reacciones de pago: ' + Number(item.count || 0);
+          return 'Reacción: ' + Number(item.count || 0);
+        }).join('\\n')
       : 'No hay conteos de reacciones disponibles.';
 
     const html = [
@@ -178,14 +186,18 @@ export function registerReactions(bot, store) {
       '📢 <b>Canal:</b> ' + escapeHtml(channel.title || update.chat.title || 'Canal'),
       '🔗 <b>Publicación:</b> ' + (link ? '<a href="' + escapeHtml(link) + '">Abrir publicación</a>' : 'Enlace no disponible'),
       '',
-      escapeHtml(summary).replace(/\n/g, '\n')
-    ].join('\n');
+      summaryHtml
+    ].join('\\n');
+    const fallback = [
+      '📊 CONTEO DE REACCIONES ACTUALIZADO',
+      '📢 Canal: ' + (channel.title || update.chat.title || 'Canal'),
+      '🔗 Publicación: ' + (link || 'Enlace no disponible'),
+      '',
+      summaryPlain
+    ].join('\\n');
 
     try {
-      await ctx.telegram.sendMessage(destinationChatId(store), html, {
-        parse_mode: 'HTML',
-        link_preview_options: { is_disabled: true }
-      });
+      await sendHtmlWithFallback(ctx.telegram, destinationChatId(store), html, fallback);
     } catch (err) {
       console.error('[REACTION COUNT ALERT]', err.description || err.message);
     }
