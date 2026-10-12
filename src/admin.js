@@ -77,6 +77,9 @@ const menuRows = [
       { text: '🚨 ALERTAS', callback_data: 'admin:alerts' }
     ],
     [
+      { text: '🔔 REACCIONES', callback_data: 'admin:reactions' }
+    ],
+    [
       { text: '🚫 BANEO GLOBAL', callback_data: 'admin:globalban' }
     ],
     [
@@ -619,6 +622,36 @@ export function registerAdmin(bot, store) {
     const channels = (await visibleChannels(ctx, store)).length;
     await ctx.answerCbQuery();
     await ctx.editMessageText('📊 ESTADÍSTICAS\n\n📢 Tus canales: ' + channels + '\n📝 Publicaciones procesadas: ' + Number(store.stats?.processed || 0) + '\n🔀 Mensajes distribuidos: ' + Number(store.stats?.distributed || 0) + '\n⚠️ Errores de distribución: ' + Number(store.stats?.distributionErrors || 0) + '\n💳 Compras: ' + Number(store.stats?.payments || 0) + '\n⭐ Stars: ' + Number(store.stats?.stars || 0) + '\n❌ Errores: ' + Number(store.stats?.errors || 0), { reply_markup: { inline_keyboard: [[{ text: '🔙 PANEL', callback_data: 'admin:home' }]] } });
+  });
+
+  bot.action('admin:reactions', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const channels = await visibleChannels(ctx, store);
+    const records = Object.values(store.global?.reactionCounts || {});
+    const channelLines = channels.map(channel => {
+      const posts = records.filter(item => String(item.channelId) === String(channel.id));
+      const total = posts.reduce((sum, post) => sum + (post.counts || []).reduce((n, reaction) => n + Number(reaction.count || 0), 0), 0);
+      return '• ' + (channel.title || channel.id) + ': ' + posts.length + ' publicaciones con conteos registrados; ' + total + ' reacciones contadas';
+    });
+    const destination = String(process.env.REACTION_ALERTS_CHAT_ID || store.global?.reactionAlertsChatId || '-1004456932813');
+    const enabled = String(process.env.REACTION_ALERTS_ENABLED || '').toLowerCase() === 'false' ? false : store.global?.reactionAlertsEnabled !== false;
+    const body = [
+      '🔔 REACCIONES DE TUS CANALES',
+      '',
+      'Avisos privados: ' + (enabled ? '🟢 ACTIVOS' : '🔴 DESACTIVADOS'),
+      'Destino: ' + destination,
+      '',
+      'Los avisos individuales solo incluyen usuarios cuando Telegram los identifica. Los conteos anónimos se muestran sin atribuirlos a personas.',
+      '',
+      channelLines.length ? channelLines.join('\\n') : 'No hay canales registrados donde seas administrador.',
+      '',
+      'Nota: los conteos se guardan desde que el bot recibe estas actualizaciones; no recupera automáticamente el historial anterior.'
+    ].join('\\n');
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(body, { reply_markup: { inline_keyboard: [
+      [{ text: '🔄 ACTUALIZAR', callback_data: 'admin:reactions' }],
+      [{ text: '🔙 PANEL', callback_data: 'admin:home' }]
+    ] } });
   });
 
   bot.action('admin:rules', async ctx => {
