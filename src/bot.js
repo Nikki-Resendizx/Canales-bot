@@ -6,6 +6,7 @@ import { registerPosts } from './posts.js';
 import { registerPayments } from './payments.js';
 import { registerPublications } from './publications.js';
 import { registerDistribution } from './distribution.js';
+import { registerReactions } from './reactions.js';
 
 const token = String(process.env.BOT_TOKEN || '').trim();
 if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
@@ -32,6 +33,7 @@ registerAdmin(bot, store);
 registerPosts(bot, store);
 registerPayments(bot, store);
 registerPublications(bot, store);
+registerReactions(bot, store);
 
 bot.command('start', (ctx) => ctx.reply(
   '🤖 CANALES-BOT\n\n' +
@@ -123,7 +125,7 @@ bot.on('callback_query', async (ctx, next) => {
   await ctx.answerCbQuery('Este botón no tiene una acción configurada.');
 });
 
-bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'chat_member', 'chat_join_request', 'pre_checkout_query'] })
+bot.launch({ allowedUpdates: ['message', 'callback_query', 'channel_post', 'my_chat_member', 'chat_member', 'chat_join_request', 'pre_checkout_query', 'message_reaction', 'message_reaction_count'] })
   .then(() => console.log('🤖 Canales-bot iniciado.'))
   .catch(err => {
     console.error('[LAUNCH ERROR]', err.description || err.message);
