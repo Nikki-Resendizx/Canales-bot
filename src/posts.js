@@ -3,85 +3,6 @@ import { parseButtonSyntax, combineKeyboards } from './button-syntax.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
 const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
-const BUTTON_ACTIONS = new Map();
-
-function normalizeButtonUrl(value) {
-  const raw = String(value || '').trim();
-  if (/^(?:t\\.me|telegram\\.me)\\//i.test(raw)) return 'https://' + raw;
-  try {
-    const parsed = new URL(raw);
-    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : '';
-  } catch { return ''; }
-}
-
-function parseSyntaxButton(input) {
-  let source = String(input || '').trim();
-  let style;
-  const color = source.match(/^(#p|#r|#g)\\s+/i);
-  if (color) {
-    style = ({ '#p': 'primary', '#r': 'danger', '#g': 'success' })[color[1].toLowerCase()];
-    source = source.slice(color[0].length).trim();
-  }
-  const match = source.match(/^(.+?)\\s+-\\s+(.+)$/);
-  if (!match) return null;
-  const title = match[1].trim();
-  const destination = match[2].trim();
-  if (!title || title.length > 64) return null;
-  const button = { text: title };
-  if (style) button.style = style;
-  const url = normalizeButtonUrl(destination);
-  if (url) { button.url = url; return button; }
-  if (/^(popup|alert):/i.test(destination)) {
-    const token = Math.random().toString(36).slice(2, 10);
-    BUTTON_ACTIONS.set(token, { kind: 'popup', payload: destination.replace(/^(popup|alert):/i, '').trim(), createdAt: Date.now() });
-    button.callback_data = 'btn:' + token;
-    return button;
-  }
-  if (/^rules$/i.test(destination)) {
-    const token = Math.random().toString(36).slice(2, 10);
-    BUTTON_ACTIONS.set(token, { kind: 'rules', payload: '', createdAt: Date.now() });
-    button.callback_data = 'btn:' + token;
-    return button;
-  }
-  if (/^share:/i.test(destination)) {
-    button.url = 'https://t.me/share/url?url=&text=' + encodeURIComponent(destination.replace(/^share:/i, '').trim());
-    return button;
-  }
-  if (/^copy:/i.test(destination)) {
-    const payload = destination.replace(/^copy:/i, '').trim();
-    if (!payload) return null;
-    button.copy_text = { text: payload };
-    return button;
-  }
-  return null;
-}
-
-export function parseButtonSyntax(input) {
-  const textLines = [];
-  const buttons = [];
-  for (const line of String(input ?? '').split(/\\r?\\n/)) {
-    const parts = line.split(/\\s*&&\\s*/);
-    const parsed = parts.map(parseSyntaxButton);
-    if (parts.length && parsed.every(Boolean)) buttons.push(parsed);
-    else textLines.push(line);
-  }
-  return { text: textLines.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim(), buttons };
-}
-
-function registerSyntaxButtonActions(bot) {
-  bot.action(/^btn:([a-z0-9]+)$/i, async ctx => {
-    const action = BUTTON_ACTIONS.get(ctx.match[1]);
-    if (!action || Date.now() - action.createdAt > 24 * 60 * 60 * 1000) {
-      BUTTON_ACTIONS.delete(ctx.match[1]);
-      return ctx.answerCbQuery('Este botón ha caducado. Vuelve a publicar el contenido.', { show_alert: true });
-    }
-    if (action.kind === 'popup') return ctx.answerCbQuery(action.payload || ' ', { show_alert: true });
-    if (action.kind === 'rules') return ctx.answerCbQuery('Consulta las reglas en la descripción o en los mensajes fijados del canal/grupo.', { show_alert: true });
-    return ctx.answerCbQuery();
-  });
-}
-
-
 function typeOf(msg) {
   if (msg.media_group_id) return 'album';
   if (msg.forward_origin || msg.forward_from || msg.forward_from_chat || msg.forward_sender_name) return 'forwarded';
@@ -371,7 +292,6 @@ async function processAlbum(ctxs, store) {
 }
 
 export function registerPosts(bot, store) {
-  registerSyntaxButtonActions(bot);
   const processed = new Set();
   const MAX_PROCESSED = 5000;
 
