@@ -397,7 +397,7 @@ export function registerAdmin(bot, store) {
   bot.action(/^tpl:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nSelecciona el tipo.\n\nVariables:\n{contenido}  {titulo}  {descripcion}\n{enlace}  {hashtags}  {fecha}  {canal}', templateKeyboard(c));
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nSelecciona el tipo.\n\nVariables:\n{contenido}  {titulo}  {descripcion}\n{enlace}  {hashtags}  {fecha}  {canal}\n\nSintaxis de botones en la plantilla:\nTítulo - t.me/Link\nTítulo - t.me/Uno && Título - t.me/Dos\nUna línea por fila. Colores: #p azul, #r rojo, #g verde. Especiales: popup:Texto, alert:Texto, rules, share:Texto, copy:Texto.', templateKeyboard(c));
     await ctx.answerCbQuery();
   });
 
