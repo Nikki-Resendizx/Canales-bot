@@ -63,7 +63,7 @@ export function registerPublications(bot, store) {
         for (let i = 0; i < orderedMessages.length; i++) {
           const parsed = parsedByIndex[i];
           const keyboard = keyboardByIndex[i];
-          if (!parsed?.keyboard?.length && !channelButtons.keyboard.length) continue;
+          if (!parsed?.keyboard?.length && !(i === 0 && channelButtons.keyboard.length)) continue;
           const copiedId = sent?.[i]?.message_id;
           if (!copiedId) continue;
           const source = orderedMessages[i];
