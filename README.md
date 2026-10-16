@@ -107,11 +107,11 @@ La configuración se guarda en `data/channels.json`, ignorado por Git. Este arch
 - No se recupera el historial anterior a la activación y Telegram puede no enviar identidad para determinadas reacciones. El módulo solo puede informar lo que la Bot API entregue.
 
 
-## CAPTCHA efímero de bienvenida (experimental)
+## Bienvenida y CAPTCHA por canal
 
-- El módulo `src/welcome-captcha.js` detecta nuevos suscriptores de canales registrados e intenta enviarles un reto aritmético con botones inline mediante `ephemeral_message_parameters`, dirigido al ID de ese suscriptor.
-- `WELCOME_CAPTCHA_ENABLED=true` activa el intento; configura `false` para desactivarlo. `WELCOME_CAPTCHA_CHANNEL_IDS` permite limitarlo a una lista de IDs separados por comas; vacío significa todos los canales registrados.
-- El bot debe ser administrador del canal y Telegram debe permitirle enviar mensajes de bienvenida (`can_send_welcome_messages`). Verifica los permisos de administrador del bot en Telegram.
-- **Compatibilidad no garantizada en canales de difusión:** la documentación de mensajes efímeros de Bot API describe principalmente grupos y supergrupos. Si Telegram rechaza el envío, el bot registra una alerta y no publica un mensaje público de reemplazo.
-- La confirmación registra el resultado durante la ejecución actual, pero **no bloquea el acceso a publicaciones del canal ni expulsa automáticamente a quien no complete el reto**. Los canales no ofrecen el mismo control de permisos por usuario que un grupo.
-- Este módulo es una integración experimental de la API: antes de considerarlo operativo, prueba una suscripción real con un canal de prueba y revisa los logs/alertas del hosting.
+- En `/admin` → Canales → selecciona un canal puedes activar/desactivar por separado **BIENVENIDA** y **CAPTCHA**, y editar sus textos individualmente.
+- Variables de bienvenida: `{nombre}`, `{username}`, `{userid}`, `{canal}`.
+- Variables del CAPTCHA: las anteriores, más `{pregunta}` y `{tiempo}`. El bot añade las opciones de respuesta cuando el CAPTCHA está activado.
+- Los ajustes se guardan en la configuración persistente de cada canal. Los valores globales `WELCOME_CAPTCHA_ENABLED` y `WELCOME_CAPTCHA_CHANNEL_IDS` siguen funcionando como interruptor maestro y filtro opcional de canales.
+- **Compatibilidad experimental:** el envío efímero de mensajes puede no estar disponible en canales de difusión. Si Telegram rechaza el envío, se registra una alerta; no se publica un mensaje público de reemplazo.
+- El CAPTCHA no bloquea el acceso a publicaciones ni expulsa a usuarios que no completen el reto. Prueba esta función con un canal de prueba antes de depender de ella.
