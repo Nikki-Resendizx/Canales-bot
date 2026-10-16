@@ -242,7 +242,7 @@ async function editOne(ctx, msg, store) {
 
   const { options, mode } = editOptions(channel, msg, originalText, text, type, [...parsedButtons.keyboard, ...channelButtons.keyboard]);
   try {
-    if ((msg.text && !text) || (!text && !options.reply_markup && !options.rich_message)) return;
+    if ((!text && !options.reply_markup && !options.rich_message)) return;
     await editWithFallback(ctx, msg, text, options);
     store.stats.processed += 1;
     saveStore(store);
