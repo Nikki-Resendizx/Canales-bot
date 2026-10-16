@@ -482,6 +482,14 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
+  bot.action(/^button:syntax:(-?\\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    setSession(ctx, { action: 'buttonsyntax', channelId: c.id });
+    await ctx.answerCbQuery();
+    await ctx.reply('🧩 SINTAXIS DE BOTONES — ' + (c.title || c.id) + '\n\nActual:\n' + (c.buttonsSyntax || '[Sin botones por sintaxis]') + '\n\nEnvía una línea por fila; separa botones de la misma fila con &&.\n\nTítulo - t.me/LinkEjemplo\nTítulo - t.me/Uno && Título - t.me/Dos\n#p Botón azul - t.me/Uno\n#r Botón rojo - t.me/Dos\n#g Botón verde - t.me/Tres\nTítulo - popup:Texto emergente\nTítulo - alert:Texto emergente\nTítulo - rules\nTítulo - share:Texto a compartir\nTítulo - copy:Texto copiable\n\nPara «rules», configura CHANNEL_RULES_URL o RULES_URL en las variables del hosting.\n/cancel para cancelar.');
+  });
+
   bot.action(/^button:add:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     setSession(ctx, { action: 'button', channelId: ctx.match[1] });
