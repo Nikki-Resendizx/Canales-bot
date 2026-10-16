@@ -54,7 +54,7 @@ function normalizeChannel(channel, global) {
   if (typeof channel.welcomeEnabled !== 'boolean') channel.welcomeEnabled = true;
   if (typeof channel.captchaEnabled !== 'boolean') channel.captchaEnabled = true;
   if (typeof channel.welcomeText !== 'string') channel.welcomeText = '👋 ¡Bienvenido/a, {nombre}!';
-  if (typeof channel.captchaText !== 'string') channel.captchaText = '🤖 Verifica que eres una persona para completar la confirmación.\\nPulsa la respuesta correcta:\\n\\n🧩 {pregunta} = ?\\n\\n⏳ Tienes {tiempo} minutos.'
+  if (typeof channel.captchaText !== 'string') channel.captchaText = '🤖 Verifica que eres una persona para completar la confirmación.\\nPulsa la respuesta correcta:\\n\\n🧩 {pregunta} = ?\\n\\n⏳ Tienes {tiempo} minutos.';
   if (typeof channel.enabled !== 'boolean') channel.enabled = true;
   return channel;
 }
