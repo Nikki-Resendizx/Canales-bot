@@ -81,3 +81,13 @@ La configuración se guarda en `data/channels.json`, ignorado por Git. Este arch
 - Cuando Telegram proporciona una identidad, el aviso incluye nombre con mención, username si existe, ID, reacción y enlace a la publicación. Las reacciones de emoji personalizado intentan mostrarse con `tg-emoji`.
 - Las actualizaciones de conteo no revelan las identidades de las personas. El bot guarda conteos recientes (hasta 500 publicaciones) y envía avisos agregados sin atribuirlos a usuarios.
 - No se recupera el historial anterior a la activación y Telegram puede no enviar identidad para determinadas reacciones. El módulo solo puede informar lo que la Bot API entregue.
+
+
+## CAPTCHA efímero de bienvenida (experimental)
+
+- El módulo `src/welcome-captcha.js` detecta nuevos suscriptores de canales registrados e intenta enviarles un reto aritmético con botones inline mediante `ephemeral_message_parameters`, dirigido al ID de ese suscriptor.
+- `WELCOME_CAPTCHA_ENABLED=true) activa el intento; configura `false` para desactivarlo. `WELCOME_CAPTCHA_CHANNEL_IDS` permite limitarlo a una lista de IDs separados por comas; vacío significa todos los canales registrados.
+- El bot debe ser administrador del canal y Telegram debe permitirle enviar mensajes de bienvenida (`can_send_welcome_messages`). Verifica los permisos de administrador del bot en Telegram.
+- **Compatibilidad no garantizada en canales de difusión:** la documentación de mensajes efímeros de Bot API describe principalmente grupos y supergrupos. Si Telegram rechaza el envío, el bot registra una alerta y no publica un mensaje público de reemplazo.
+- La confirmación registra el resultado durante la ejecución actual, pero **no bloquea el acceso a publicaciones del canal ni expulsa automáticamente a quien no complete el reto**. Los canales no ofrecen el mismo control de permisos por usuario que un grupo.
+- Este módulo es una integración experimental de la API: antes de considerarlo operativo, prueba una suscripción real con un canal de prueba y revisa los logs/alertas del hosting.
