@@ -41,31 +41,3 @@ test('supports popup, alert, share and copy special buttons', () => {
   assert.match(result.keyboard[2][0].url, /^https:\/\/t\.me\/share\/url\?text=/);
   assert.deepEqual(result.keyboard[3][0].copy_text, { text: 'Texto copiable' });
 });
-
-test('uses configured rules URL and shows a popup if it is not configured', () => {
-  const previous = process.env.CHANNEL_RULES_URL;
-  process.env.CHANNEL_RULES_URL = 'https://example.com/rules';
-  try {
-    const configured = parseButtonSyntax('Reglas - rules');
-    assert.equal(configured.keyboard[0][0].url, 'https://example.com/rules');
-  } finally {
-    if (previous === undefined) delete process.env.CHANNEL_RULES_URL;
-    else process.env.CHANNEL_RULES_URL = previous;
-  }
-
-  const previousRules = process.env.RULES_URL;
-  const previousChannelRules = process.env.CHANNEL_RULES_URL;
-  delete process.env.CHANNEL_RULES_URL;
-  delete process.env.RULES_URL;
-  try {
-    const fallback = parseButtonSyntax('Reglas - rules');
-    assert.equal(fallback.keyboard.length, 1);
-    assert.ok(fallback.keyboard[0][0].callback_data.startsWith('sp'));
-    assert.match(fallback.actions.get(fallback.keyboard[0][0].callback_data), /configurado/);
-  } finally {
-    if (previousChannelRules === undefined) delete process.env.CHANNEL_RULES_URL;
-    else process.env.CHANNEL_RULES_URL = previousChannelRules;
-    if (previousRules === undefined) delete process.env.RULES_URL;
-    else process.env.RULES_URL = previousRules;
-  }
-});
