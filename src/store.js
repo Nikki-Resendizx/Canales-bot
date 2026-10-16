@@ -51,6 +51,10 @@ function normalizeChannel(channel, global) {
   for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
   channel.normalize = channel.normalize !== false;
   channel.testMode = channel.testMode === true;
+  if (typeof channel.welcomeEnabled !== 'boolean') channel.welcomeEnabled = true;
+  if (typeof channel.captchaEnabled !== 'boolean') channel.captchaEnabled = true;
+  if (typeof channel.welcomeText !== 'string') channel.welcomeText = '👋 ¡Bienvenido/a, {nombre}!';
+  if (typeof channel.captchaText !== 'string') channel.captchaText = '🤖 Verifica que eres una persona para completar la confirmación.\\nPulsa la respuesta correcta:\\n\\n🧩 {pregunta} = ?\\n\\n⏳ Tienes {tiempo} minutos.'
   if (typeof channel.enabled !== 'boolean') channel.enabled = true;
   return channel;
 }
@@ -138,6 +142,10 @@ export function ensureChannel(store, id, title = '') {
       title,
       enabled: true,
       testMode: false,
+      welcomeEnabled: true,
+      captchaEnabled: true,
+      welcomeText: '👋 ¡Bienvenido/a, {nombre}!',
+      captchaText: '🤖 Verifica que eres una persona para completar la confirmación.\\nPulsa la respuesta correcta:\\n\\n🧩 {pregunta} = ?\\n\\n⏳ Tienes {tiempo} minutos.',
       templates: { ...store.global.templates },
       hashtags: [],
       buttons: [],
