@@ -1,4 +1,5 @@
 import { ensureChannel, recordAlert, saveStore } from './store.js';
+import { parseButtonSyntax, combineKeyboards } from './button-syntax.js';
 
 const URL_RE = /https?:\/\/[^\s<>"']+/i;
 const FORMATS = ['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'];
@@ -131,15 +132,16 @@ function buildMarkup(channel) {
   return grouped.some(Boolean) ? { inline_keyboard: grouped.filter(Boolean) } : undefined;
 }
 
-export function editOptions(channel, msg, originalText, finalText, type) {
+export function editOptions(channel, msg, originalText, finalText, type, syntaxKeyboard = []) {
   const configured = formatFor(channel, type);
   const nativeEntities = originalEntities(msg, originalText, finalText);
   const mode = configured === 'AUTO'
     ? (nativeEntities?.length ? 'Telegram' : detectFormat(finalText))
     : configured;
   const options = {};
-  const markup = buildMarkup(channel);
-  if (markup) options.reply_markup = markup;
+  const configuredMarkup = buildMarkup(channel);
+  const combinedMarkup = combineKeyboards(syntaxKeyboard, configuredMarkup?.inline_keyboard);
+  if (combinedMarkup) options.reply_markup = combinedMarkup;
 
   if (mode === 'HTML' || mode === 'Markdown' || mode === 'MarkdownV2') {
     options.parse_mode = mode;
@@ -229,13 +231,15 @@ async function editOne(ctx, msg, store) {
 
   const originalText = contentOf(msg);
   const type = typeOf(msg);
-  const text = render(channel, type, msg);
+  const renderedText = render(channel, type, msg);
+  const parsedButtons = parseButtonSyntax(renderedText);
+  const text = parsedButtons.text;
   if (channel.testMode) {
     await sendTestPreview(ctx, store, msg, type, text);
     return;
   }
 
-  const { options, mode } = editOptions(channel, msg, originalText, text, type);
+  const { options, mode } = editOptions(channel, msg, originalText, text, type, parsedButtons.keyboard);
   try {
     if ((msg.text && !text) || (!text && !options.reply_markup && !options.rich_message)) return;
     await editWithFallback(ctx, msg, text, options);
@@ -261,13 +265,15 @@ async function processAlbum(ctxs, store) {
   if (!channel.enabled) return;
 
   const originalText = contentOf(msg);
-  const text = render(channel, 'album', msg);
+  const renderedText = render(channel, 'album', msg);
+  const parsedButtons = parseButtonSyntax(renderedText);
+  const text = parsedButtons.text;
   if (channel.testMode) {
     await sendTestPreview(ctxs[0], store, msg, 'album', text);
     return;
   }
 
-  const { options, mode } = editOptions(channel, msg, originalText, text, 'album');
+  const { options, mode } = editOptions(channel, msg, originalText, text, 'album', parsedButtons.keyboard);
   try {
     if (msg.photo || msg.video || msg.audio || msg.document) {
       await editWithFallback(ctxs[0], msg, text, options);
