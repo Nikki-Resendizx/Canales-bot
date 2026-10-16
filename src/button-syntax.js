@@ -32,8 +32,8 @@ function parseButton(titleRaw, targetRaw, style, actions) {
 
   if (/^rules$/i.test(target)) {
     const rulesUrl = String(process.env.CHANNEL_RULES_URL || process.env.RULES_URL || '').trim();
-    if (!validHttpUrl(rulesUrl)) return null;
-    return { ...button, url: rulesUrl };
+    if (validHttpUrl(rulesUrl)) return { ...button, url: rulesUrl };
+    return addPopup(title, 'El administrador aún no ha configurado el enlace de reglas.', style, actions);
   }
 
   if (/^share:/i.test(target)) {
