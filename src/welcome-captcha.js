@@ -67,15 +67,15 @@ function buildKeyboard(chatId, userId, token, choices) {
 }
 
 export function registerWelcomeCaptcha(bot, store) {
-  bot.on('chat_member', async ctx => {
-    if (!enabled()) return;
+  bot.on('chat_member', async (ctx, next) => {
+    if (!enabled()) return next();
     const update = ctx.update?.chat_member;
-    if (!update || !isJoining(update)) return;
+    if (!update || !isJoining(update)) return next();
 
     const chatId = String(update.chat?.id || '');
     const user = update.new_chat_member.user;
     const userId = String(user.id);
-    if (!store.channels?.[chatId] || !configuredChannels(store).has(chatId)) return;
+    if (!store.channels?.[chatId] || !configuredChannels(store).has(chatId)) return next();
 
     pruneChallenges();
     const challenge = makeChallenge();
@@ -116,6 +116,7 @@ export function registerWelcomeCaptcha(bot, store) {
         'Telegram rechazó o no entregó el CAPTCHA efímero para el nuevo suscriptor.',
         { channelId: chatId, userId, error: String(err.description || err.message || err).slice(0, 300) });
     }
+    return next();
   });
 
   bot.action(/^wc:(-100\d{5,}):(\d+):([a-z0-9]+):(\d+)$/, async ctx => {
