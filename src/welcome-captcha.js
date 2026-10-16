@@ -88,9 +88,9 @@ function parseSpecialButton(title, target, style, uniqueId) {
     if (!copyText || copyText.length > 256) return null;
     return { button: { ...button, copy_text: { text: copyText } } };
   }
-  if (!validUrl(value)) return null;
   let url = value;
   if (/^t\.me\//i.test(url)) url = 'https://' + url;
+  if (!validUrl(url)) return null;
   if (!/^https?:\/\//i.test(url)) return null;
   return { button: { ...button, url } };
 }
