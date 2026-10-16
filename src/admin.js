@@ -575,16 +575,85 @@ export function registerAdmin(bot, store) {
   bot.action('admin:globalban', async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     clearSession(ctx);
+    const count = Array.isArray(store.global.globalBans) ? store.global.globalBans.length : 0;
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+      '🚫 BANEO GLOBAL + BLACKLIST\n\n' +
+      'Usuarios en blacklist: ' + count + '\n' +
+      'Los usuarios guardados aquí se bloquearán cuando intenten entrar o soliciten acceso a los canales conectados.\n\n' +
+      'Selecciona una opción:',
+      { reply_markup: { inline_keyboard: [
+        [{ text: '🚫 BANEAR GLOBALMENTE', callback_data: 'globalban:start' }],
+        [{ text: '➕ AÑADIR A BLACKLIST', callback_data: 'globalban:add' }],
+        [{ text: '📋 VER / EDITAR BLACKLIST (' + count + ')', callback_data: 'globalban:blacklist' }],
+        [{ text: '🔙 PANEL', callback_data: 'admin:home' }]
+      ] } }
+    );
+  });
+
+  async function startGlobalBanInput(ctx, title) {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
     await ctx.answerCbQuery();
     await ctx.reply(
-      '🚫 BANEO GLOBAL\n\n' +
+      title + '\n\n' +
       'Envía SOLO uno de estos datos: USER_ID numérico o USERNAME (@usuario).\n' +
       'Ejemplos: 5389683864  ó  @usuario\n\n' +
       'Si envías USERNAME, el bot solo podrá usarlo si ya conoce esa cuenta por una actualización de Telegram. Si no puede resolverlo, te pedirá el USER_ID.\n' +
-      'El baneo se intentará en los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
+      'Al confirmar, el USER_ID quedará guardado en la blacklist y el bot intentará bloquearlo en los canales registrados donde tú seas administrador y el bot tenga permiso para restringir miembros.\n\n' +
       '/cancel para cancelar.'
     );
     setSession(ctx, { action: 'globalban' });
+  }
+
+  bot.action('globalban:start', ctx => startGlobalBanInput(ctx, '🚫 BANEO GLOBAL'));
+  bot.action('globalban:add', ctx => startGlobalBanInput(ctx, '➕ AÑADIR A BLACKLIST'));
+
+  bot.action('globalban:blacklist', async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    clearSession(ctx);
+    const ids = Array.isArray(store.global.globalBans) ? [...new Set(store.global.globalBans.map(String))] : [];
+    const usernames = store.global.globalBanUsernames && typeof store.global.globalBanUsernames === 'object'
+      ? store.global.globalBanUsernames : {};
+    const visible = ids.slice(-20).reverse();
+    const rows = visible.map(id => [{
+      text: '🗑️ QUITAR ' + (usernames[id] ? '@' + usernames[id] : id),
+      callback_data: 'globalban:remove:' + id
+    }]);
+    rows.push([{ text: '➕ AÑADIR A BLACKLIST', callback_data: 'globalban:add' }]);
+    rows.push([{ text: '🔙 BANEO GLOBAL', callback_data: 'admin:globalban' }]);
+    const body = '📋 BLACKLIST GLOBAL\n\n' +
+      (ids.length ? 'Total: ' + ids.length + '\n' +
+        visible.map(id => '• ' + (usernames[id] ? '@' + usernames[id] + ' — ' : '') + id).join('\n') +
+        (ids.length > visible.length ? '\n\nMostrando los 20 más recientes.' : '') :
+        'La blacklist está vacía.') +
+      '\n\nAl quitar a alguien de la blacklist no se deshacen automáticamente los baneos ya aplicados en Telegram.';
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(body, { reply_markup: { inline_keyboard: rows } });
+  });
+
+  bot.action(/^globalban:remove:(\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = String(ctx.match[1]);
+    store.global.globalBans = (Array.isArray(store.global.globalBans) ? store.global.globalBans : []).map(String).filter(value => value !== id);
+    if (store.global.globalBanUsernames && typeof store.global.globalBanUsernames === 'object') delete store.global.globalBanUsernames[id];
+    saveStore(store);
+    await ctx.answerCbQuery('Quitado de la blacklist');
+    const ids = [...new Set(store.global.globalBans.map(String))];
+    const usernames = store.global.globalBanUsernames || {};
+    const visible = ids.slice(-20).reverse();
+    const rows = visible.map(value => [{
+      text: '🗑️ QUITAR ' + (usernames[value] ? '@' + usernames[value] : value),
+      callback_data: 'globalban:remove:' + value
+    }]);
+    rows.push([{ text: '➕ AÑADIR A BLACKLIST', callback_data: 'globalban:add' }]);
+    rows.push([{ text: '🔙 BANEO GLOBAL', callback_data: 'admin:globalban' }]);
+    const body = '📋 BLACKLIST GLOBAL\n\n' +
+      (ids.length ? 'Total: ' + ids.length + '\n' +
+        visible.map(value => '• ' + (usernames[value] ? '@' + usernames[value] + ' — ' : '') + value).join('\n') +
+        (ids.length > visible.length ? '\n\nMostrando los 20 más recientes.' : '') : 'La blacklist está vacía.') +
+      '\n\nAl quitar a alguien de la blacklist no se deshacen automáticamente los baneos ya aplicados en Telegram.';
+    await ctx.editMessageText(body, { reply_markup: { inline_keyboard: rows } });
   });
 
   bot.action('globalban:cancel', async ctx => {
