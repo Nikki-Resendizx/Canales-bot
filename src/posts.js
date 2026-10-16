@@ -167,7 +167,7 @@ async function applyEdit(ctx, msg, text, options) {
   }
 
   if (msg.text) {
-    return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || '', options);
+    return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || (options.reply_markup ? ' ' : ''), options);
   }
 
   const isMedia = msg.photo || msg.video || msg.animation || msg.audio || msg.document;
@@ -268,6 +268,7 @@ async function processAlbum(ctxs, store) {
   const originalText = contentOf(msg);
   const renderedText = render(channel, 'album', msg);
   const parsedButtons = parseButtonSyntax(renderedText);
+  const channelButtons = parseButtonSyntax(channel.buttonsSyntax || '');
   const text = parsedButtons.text;
   if (channel.testMode) {
     await sendTestPreview(ctxs[0], store, msg, 'album', text);
