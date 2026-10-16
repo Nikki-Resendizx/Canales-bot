@@ -43,12 +43,8 @@ function makeChallenge() {
 
 function pruneChallenges() {
   const now = Date.now();
-  for (const [key, value] of challenges) {
-    if (value.expiresAt <= now) challenges.delete(key);
-  }
-  for (const [key, value] of verified) {
-    if (value.expiresAt <= now) verified.delete(key);
-  }
+  for (const [key, value] of challenges) if (value.expiresAt <= now) challenges.delete(key);
+  for (const [key, value] of verified) if (value.expiresAt <= now) verified.delete(key);
   while (challenges.size > MAX_CHALLENGES) challenges.delete(challenges.keys().next().value);
   while (verified.size > MAX_CHALLENGES) verified.delete(verified.keys().next().value);
 }
@@ -57,16 +53,101 @@ function keyFor(chatId, userId) {
   return String(chatId) + ':' + String(userId);
 }
 
+function validUrl(value) {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:', 'tg:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function parseSpecialButton(title, target, style) {
+  const text = title.trim();
+  const value = target.trim();
+  if (!text || !value) return null;
+  const button = { text, style };
+
+  if (/^popup:/i.test(value) || /^alert:/i.test(value)) {
+    const popupText = value.replace(/^(?:popup|alert):/i, '').trim();
+    if (!popupText) return null;
+    return { button: { ...button, callback_data: 'wcp:' + Buffer.from(popupText, 'utf8').toString('base64url').slice(0, 48) }, action: { type: 'popup', text: popupText } };
+  }
+  if (/^rules$/i.test(value)) {
+    const rulesUrl = String(process.env.WELCOME_CAPTCHA_RULES_URL || '').trim();
+    if (!validUrl(rulesUrl)) return null;
+    return { button: { ...button, url: rulesUrl } };
+  }
+  if (/^share:/i.test(value)) {
+    const shareText = value.replace(/^share:/i, '').trim();
+    if (!shareText) return null;
+    return { button: { ...button, url: 'https://t.me/share/url?text=' + encodeURIComponent(shareText) } };
+  }
+  if (/^copy:/i.test(value)) {
+    const copyText = value.replace(/^copy:/i, '').trim();
+    if (!copyText || copyText.length > 256) return null;
+    return { button: { ...button, copy_text: { text: copyText } } };
+  }
+  if (!validUrl(value)) return null;
+  let url = value;
+  if (/^t\.me\//i.test(url)) url = 'https://' + url;
+  if (!/^https?:\/\//i.test(url)) return null;
+  return { button: { ...button, url } };
+}
+
+/**
+ * Syntax per line: [#p|#r|#g] Button title - URL / popup:text / alert:text /
+ * rules / share:text / copy:text. Use && to put multiple buttons on one row.
+ * Blank lines create visual separation only; each non-empty line is a row.
+ */
+export function parseWelcomeButtonSyntax(source) {
+  const rows = [];
+  const actions = new Map();
+  const lines = String(source || '').split(/\r?\n/);
+  let actionIndex = 0;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const pieces = line.split(/\s*&&\s*/);
+    const row = [];
+    for (let piece of pieces) {
+      let style = 'primary';
+      if (/^#p\s+/i.test(piece)) { style = 'primary'; piece = piece.replace(/^#p\s+/i, ''); }
+      else if (/^#r\s+/i.test(piece)) { style = 'danger'; piece = piece.replace(/^#r\s+/i, ''); }
+      else if (/^#g\s+/i.test(piece)) { style = 'success'; piece = piece.replace(/^#g\s+/i, ''); }
+
+      const splitAt = piece.indexOf(' - ');
+      if (splitAt <= 0) continue;
+      const title = piece.slice(0, splitAt).trim();
+      const target = piece.slice(splitAt + 3).trim();
+      const parsed = parseSpecialButton(title, target, style);
+      if (!parsed) continue;
+      if (parsed.action) {
+        const id = 'wcp:' + (++actionIndex).toString(36);
+        parsed.button.callback_data = id;
+        actions.set(id, parsed.action);
+      }
+      row.push(parsed.button);
+    }
+    if (row.length) rows.push(row);
+  }
+  return { rows, actions };
+}
+
 function buildKeyboard(chatId, userId, token, choices) {
+  const answerRow = choices.map(answer => ({
+    text: String(answer),
+    callback_data: ['wc', chatId, userId, token, answer].join(':')
+  }));
+  const custom = parseWelcomeButtonSyntax(process.env.WELCOME_CAPTCHA_BUTTONS || '');
   return {
-    inline_keyboard: [choices.map(answer => ({
-      text: String(answer),
-      callback_data: ['wc', chatId, userId, token, answer].join(':')
-    }))]
+    inline_keyboard: [answerRow, ...custom.rows],
+    _actions: custom.actions
   };
 }
 
 export function registerWelcomeCaptcha(bot, store) {
+  const customActions = new Map();
   bot.on('chat_member', async (ctx, next) => {
     if (!enabled()) return next();
     const update = ctx.update?.chat_member;
@@ -81,13 +162,7 @@ export function registerWelcomeCaptcha(bot, store) {
     const challenge = makeChallenge();
     const token = Math.random().toString(36).slice(2, 10);
     const key = keyFor(chatId, userId);
-    challenges.set(key, {
-      token,
-      answer: challenge.answer,
-      expiresAt: Date.now() + CHALLENGE_TTL_MS,
-      userId,
-      chatId
-    });
+    challenges.set(key, { token, answer: challenge.answer, expiresAt: Date.now() + CHALLENGE_TTL_MS, userId, chatId });
 
     const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || 'suscriptor';
     const text = [
@@ -102,10 +177,13 @@ export function registerWelcomeCaptcha(bot, store) {
     ].join('\n');
 
     try {
+      const markup = buildKeyboard(chatId, userId, token, challenge.choices);
+      for (const [id, action] of markup._actions) customActions.set(id, action);
+      delete markup._actions;
       await ctx.telegram.callApi('sendMessage', {
         chat_id: chatId,
         text,
-        reply_markup: buildKeyboard(chatId, userId, token, challenge.choices),
+        reply_markup: markup,
         ephemeral_message_parameters: { receiver_user_id: Number(userId) }
       });
       console.log('[WELCOME CAPTCHA] Ephemeral challenge requested:', chatId, userId);
@@ -119,24 +197,24 @@ export function registerWelcomeCaptcha(bot, store) {
     return next();
   });
 
-  bot.action(/^wc:(-100\d{5,}):(\d+):([a-z0-9]+):(\d+)$/, async ctx => {
-    const match = ctx.match;
-    const [, chatId, userId, token, answerRaw] = match;
-    if (String(ctx.from?.id) !== userId) {
-      return ctx.answerCbQuery('Este CAPTCHA pertenece a otro suscriptor.');
-    }
+  bot.action(/^wcp:[a-z0-9]+$/, async ctx => {
+    const action = customActions.get(ctx.callbackQuery?.data);
+    if (!action) return ctx.answerCbQuery('Este botón ya no está disponible.');
+    if (action.type === 'popup') return ctx.answerCbQuery(action.text.slice(0, 190), { show_alert: true });
+  });
 
+  bot.action(/^wc:(-100\d{5,}):(\d+):([a-z0-9]+):(\d+)$/, async ctx => {
+    const [, chatId, userId, token, answerRaw] = ctx.match;
+    if (String(ctx.from?.id) !== userId) return ctx.answerCbQuery('Este CAPTCHA pertenece a otro suscriptor.');
     const key = keyFor(chatId, userId);
     const challenge = challenges.get(key);
     if (!challenge || challenge.token !== token || challenge.expiresAt <= Date.now()) {
       challenges.delete(key);
       return ctx.answerCbQuery('El CAPTCHA venció. Si necesitas ayuda, contacta a un administrador.');
     }
-
     if (Number(answerRaw) !== challenge.answer) {
       return ctx.answerCbQuery('❌ Respuesta incorrecta. Intenta otra opción.', { show_alert: true });
     }
-
     challenges.delete(key);
     verified.set(key, { verifiedAt: Date.now(), expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
     pruneChallenges();
