@@ -220,7 +220,20 @@ export function registerWelcomeCaptcha(bot, store) {
       return ctx.answerCbQuery('El CAPTCHA venció. Si necesitas ayuda, contacta a un administrador.');
     }
     if (Number(answerRaw) !== challenge.answer) {
-      return ctx.answerCbQuery('❌ Respuesta incorrecta. Intenta otra opción.', { show_alert: true });
+      challenges.delete(key);
+      await ctx.answerCbQuery('❌ Respuesta incorrecta. Serás expulsado del canal.', { show_alert: true });
+      try {
+        // Ban + unban removes the member while allowing them to join again later.
+        await ctx.telegram.banChatMember(chatId, Number(userId));
+        await ctx.telegram.unbanChatMember(chatId, Number(userId), { only_if_banned: true });
+        console.log('[WELCOME CAPTCHA] Kicked after wrong answer:', chatId, userId);
+      } catch (err) {
+        console.warn('[WELCOME CAPTCHA KICK FAILED]', chatId, userId, err.description || err.message);
+        recordAlert(store, 'welcome-captcha-kick-failed',
+          'No se pudo expulsar a un suscriptor que respondió incorrectamente al CAPTCHA.',
+          { channelId: chatId, userId, error: String(err.description || err.message || err).slice(0, 300) });
+      }
+      return;
     }
     challenges.delete(key);
     verified.set(key, { verifiedAt: Date.now(), expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
