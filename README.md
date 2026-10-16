@@ -57,6 +57,32 @@ En FadeHost configura el comando de inicio como `npm start` y Node.js 20+.
 - Restaurar un backup: abre `/admin`, entra en `BACKUP / RESTAURAR` y sigue las instrucciones.
 - `/cancel`: cancelar la operación actual.
 
+## Sintaxis de botones para publicaciones y plantillas
+
+Puedes escribir los botones directamente en una plantilla automática o configurar una sintaxis general por canal desde `/admin` → Canales → selecciona el canal → Botones → **Editar sintaxis de botones**. En publicaciones gratuitas creadas con `/publish`, la misma sintaxis se interpreta en el texto o pie de foto y se quita de lo que ve el público.
+
+```text
+Título del botón - t.me/LinkEjemplo
+Título del botón - t.me/Uno && Título del botón - t.me/Dos
+Título del botón - t.me/Primero
+Título del botón - t.me/Segundo
+#p Botón azul - t.me/LinkEjemplo
+#r Botón rojo - t.me/LinkEjemplo
+#g Botón verde - t.me/LinkEjemplo
+Título del botón - popup:Texto emergente
+Título del botón - alert:Texto emergente
+Título del botón - rules
+Título del botón - share:Texto a compartir
+Título del botón - copy:Texto copiable
+```
+
+- Cada línea de botones crea una fila; `&&` coloca varios botones en una sola fila.
+- `#p`, `#r` y `#g` seleccionan los estilos azul, rojo y verde de Telegram.
+- `popup:` y `alert:` abren una ventana emergente. `share:` abre el selector de compartir de Telegram. `copy:` utiliza el botón nativo de copiar texto cuando la versión de Telegram lo admite.
+- `rules` utiliza la URL configurada en `CHANNEL_RULES_URL` (también acepta `RULES_URL`). Si no está configurada, esa línea no se convierte en botón.
+- Los botones emergentes son temporales en memoria; tras reiniciar el bot, los botones antiguos que aún estén publicados pueden dejar de mostrar su popup.
+- Los botones de sintaxis de publicaciones gratuitas se aplican al publicar. Las publicaciones premium conservan el flujo de compra y entrega privada, sin interpretar esta sintaxis.
+
 ## Datos y persistencia
 
 La configuración se guarda en `data/channels.json`, ignorado por Git. Este archivo se crea en ejecución. Si FadeHost permite montar un volumen persistente, configura `DATA_DIR` con la ruta de ese volumen. El hosting debe ofrecer almacenamiento persistente o el bot perderá configuración, publicaciones y registros al reiniciarse o reconstruirse. Haz respaldos periódicos.
