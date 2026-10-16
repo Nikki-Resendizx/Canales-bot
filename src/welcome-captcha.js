@@ -223,10 +223,9 @@ export function registerWelcomeCaptcha(bot, store) {
       challenges.delete(key);
       await ctx.answerCbQuery('❌ Respuesta incorrecta. Serás expulsado del canal.', { show_alert: true });
       try {
-        // Ban + unban removes the member while allowing them to join again later.
+        // Keep the ban in place permanently; do not unban this user.
         await ctx.telegram.banChatMember(chatId, Number(userId));
-        await ctx.telegram.unbanChatMember(chatId, Number(userId), { only_if_banned: true });
-        console.log('[WELCOME CAPTCHA] Kicked after wrong answer:', chatId, userId);
+        console.log('[WELCOME CAPTCHA] Permanently banned after wrong answer:', chatId, userId);
       } catch (err) {
         console.warn('[WELCOME CAPTCHA KICK FAILED]', chatId, userId, err.description || err.message);
         recordAlert(store, 'welcome-captcha-kick-failed',
