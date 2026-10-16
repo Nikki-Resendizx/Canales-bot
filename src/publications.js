@@ -170,7 +170,7 @@ export function registerPublications(bot, store) {
     await ctx.answerCbQuery();
     await ctx.reply(session.mode === 'paid'
       ? '⭐ PRECIO\n\nEnvíame solamente la cantidad de Stars (número entero mayor que 0).\nEjemplo: 50\n\n/cancel para cancelar.'
-      : '📝 CONTENIDO\n\nEnvíame texto, foto, video o un álbum.\n\n/cancel para cancelar.');
+      : '📝 CONTENIDO\n\nEnvíame texto, foto, video o un álbum.\n\nBotones opcionales al final del texto:\nTítulo - t.me/Enlace\nTítulo - t.me/Uno && Título - t.me/Dos\n#p Azul - t.me/Enlace\nTítulo - popup:Texto\nTítulo - share:Texto\nTítulo - copy:Texto\n\n/cancel para cancelar.');
   });
 
   bot.on('message', async (ctx, next) => {
