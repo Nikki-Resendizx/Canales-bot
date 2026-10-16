@@ -77,13 +77,11 @@ const menuRows = [
       { text: '🚨 ALERTAS', callback_data: 'admin:alerts' }
     ],
     [
-      { text: '🔔 REACCIONES', callback_data: 'admin:reactions' }
+      { text: '🔔 REACCIONES', callback_data: 'admin:reactions' },
+      { text: '🚫 BANEO GLOBAL', callback_data: 'admin:globalban' },
+      { text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' }
     ],
     [
-      { text: '🚫 BANEO GLOBAL', callback_data: 'admin:globalban' }
-    ],
-    [
-      { text: '💾 BACKUP / RESTAURAR', callback_data: 'admin:backup' },
       { text: '🔀 DISTRIBUCIÓN', callback_data: 'admin:distribution' },
       { text: '⚙️ CONFIGURACIÓN', callback_data: 'admin:settings' }
     ]
@@ -195,13 +193,25 @@ const clearSession = ctx => sessions.delete(key(ctx));
 
 function channelMenu(c) {
   return { reply_markup: { inline_keyboard: [
-    [{ text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id }],
-    [{ text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id }],
-    [{ text: '🔘 BOTONES', callback_data: 'btn:' + c.id }],
-    [{ text: c.enabled ? '🔴 DESACTIVAR' : '🟢 ACTIVAR', callback_data: 'toggle:' + c.id }],
-    [{ text: c.testMode ? '🧪 PRUEBA: ACTIVADA' : '🧪 ACTIVAR MODO PRUEBA', callback_data: 'testmode:' + c.id }],
-    [{ text: '🗑️ ELIMINAR', callback_data: 'delete:' + c.id }],
-    [{ text: '🔙 CANALES', callback_data: 'admin:channels' }]
+    [
+      { text: '📝 PLANTILLAS', callback_data: 'tpl:' + c.id },
+      { text: '#️⃣ HASHTAGS', callback_data: 'hash:' + c.id },
+      { text: '🔘 BOTONES', callback_data: 'btn:' + c.id }
+    ],
+    [
+      { text: (c.welcomeEnabled === false ? '🔴' : '🟢') + ' BIENVENIDA', callback_data: 'welcome:toggle:' + c.id },
+      { text: '✏️ EDITAR BIENVENIDA', callback_data: 'welcome:edit:' + c.id },
+      { text: (c.captchaEnabled === false ? '🔴' : '🟢') + ' CAPTCHA', callback_data: 'captcha:toggle:' + c.id }
+    ],
+    [
+      { text: '✏️ EDITAR CAPTCHA', callback_data: 'captcha:edit:' + c.id },
+      { text: c.enabled ? '🔴 DESACTIVAR CANAL' : '🟢 ACTIVAR CANAL', callback_data: 'toggle:' + c.id },
+      { text: c.testMode ? '🧪 PRUEBA: ACTIVADA' : '🧪 MODO PRUEBA', callback_data: 'testmode:' + c.id }
+    ],
+    [
+      { text: '🗑️ ELIMINAR', callback_data: 'delete:' + c.id },
+      { text: '🔙 CANALES', callback_data: 'admin:channels' }
+    ]
   ]}};
 }
 
@@ -367,6 +377,40 @@ export function registerAdmin(bot, store) {
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.editMessageText('📢 ' + (c.title || 'Canal') + '\n\n🆔 ' + c.id + '\nEstado: ' + (c.enabled ? '🟢 Activo' : '🔴 Inactivo'), channelMenu(c));
     await ctx.answerCbQuery();
+  });
+
+  bot.action(/^welcome:toggle:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.welcomeEnabled = c.welcomeEnabled === false;
+    saveStore(store);
+    await ctx.editMessageText('📢 ' + (c.title || c.id) + '\n\nBienvenida: ' + (c.welcomeEnabled ? '🟢 Activada' : '🔴 Desactivada') + '\nCAPTCHA: ' + (c.captchaEnabled === false ? '🔴 Desactivado' : '🟢 Activado'), channelMenu(c));
+    await ctx.answerCbQuery(c.welcomeEnabled ? 'Bienvenida activada' : 'Bienvenida desactivada');
+  });
+
+  bot.action(/^captcha:toggle:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.captchaEnabled = c.captchaEnabled === false;
+    saveStore(store);
+    await ctx.editMessageText('📢 ' + (c.title || c.id) + '\n\nBienvenida: ' + (c.welcomeEnabled === false ? '🔴 Desactivada' : '🟢 Activada') + '\nCAPTCHA: ' + (c.captchaEnabled ? '🟢 Activado' : '🔴 Desactivado'), channelMenu(c));
+    await ctx.answerCbQuery(c.captchaEnabled ? 'CAPTCHA activado' : 'CAPTCHA desactivado');
+  });
+
+  bot.action(/^welcome:edit:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = ctx.match[1], c = ensureChannel(store, id);
+    setSession(ctx, { action: 'welcomeText', channelId: id });
+    await ctx.answerCbQuery();
+    return ctx.reply('✏️ EDITAR BIENVENIDA — ' + (c.title || c.id) + '\n\nEnvía el texto de bienvenida. Variables: {nombre}, {username}, {userid}, {canal}. Usa /cancel para cancelar.\n\nTexto actual:\n' + (c.welcomeText || '👋 ¡Bienvenido/a, {nombre}!'), { reply_markup: { force_reply: true } });
+  });
+
+  bot.action(/^captcha:edit:(-?\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const id = ctx.match[1], c = ensureChannel(store, id);
+    setSession(ctx, { action: 'captchaText', channelId: id });
+    await ctx.answerCbQuery();
+    return ctx.reply('✏️ EDITAR MENSAJE CAPTCHA — ' + (c.title || c.id) + '\n\nEnvía el texto que acompaña el reto. Variables: {nombre}, {username}, {userid}, {canal}, {pregunta}, {tiempo}. El reto y las respuestas se añadirán automáticamente. Usa /cancel para cancelar.\n\nTexto actual:\n' + (c.captchaText || '🤖 Verifica que eres una persona para completar la confirmación.\nPulsa la respuesta correcta:\n\n🧩 {pregunta} = ?\n\n⏳ Tienes {tiempo} minutos.'), { reply_markup: { force_reply: true } });
   });
 
   bot.action(/^toggle:(-?\d+)$/, async ctx => {
@@ -1011,6 +1055,17 @@ export function registerAdmin(bot, store) {
       saveStore(store);
       clearSession(ctx);
       return ctx.reply('✅ Administrador añadido: ' + id);
+    }
+
+    if (s.action === 'welcomeText' || s.action === 'captchaText') {
+      const c = ensureChannel(store, s.channelId);
+      if (s.action === 'welcomeText') c.welcomeText = ctx.message.text.trim().slice(0, 3500);
+      else c.captchaText = ctx.message.text.trim().slice(0, 2500);
+      saveStore(store);
+      clearSession(ctx);
+      return ctx.reply(s.action === 'welcomeText' ? '✅ Bienvenida guardada para este canal.' : '✅ Mensaje del CAPTCHA guardado para este canal.', {
+        reply_markup: { inline_keyboard: [[{ text: '⚙️ VOLVER AL CANAL', callback_data: 'channel:' + c.id }]] }
+      });
     }
 
     if (s.action === 'buttonsyntax') {
