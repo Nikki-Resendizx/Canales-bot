@@ -1,4 +1,5 @@
 import { ensureChannel, recordAlert, saveStore } from './store.js';
+import { parseButtonSyntax, combineKeyboards } from './button-syntax.js';
 
 function admin(ctx, store) {
   const roots = String(process.env.ADMIN_IDS || '').split(',').map(value => value.trim()).filter(Boolean);
@@ -17,7 +18,11 @@ export function registerPublications(bot, store) {
 
   async function publishContent(ctx, session, messages) {
     const channel = ensureChannel(store, session.channelId);
-    const messageIds = messages.map(message => message.message_id).sort((a, b) => a - b);
+    const orderedMessages = [...messages].sort((a, b) => a.message_id - b.message_id);
+    const messageIds = orderedMessages.map(message => message.message_id);
+    const parsedByIndex = session.mode === 'free' ? orderedMessages.map(message => parseButtonSyntax(String(message.text || message.caption || ''))) : [];
+    const channelButtons = session.mode === 'free' ? parseButtonSyntax(channel.buttonsSyntax || '') : { keyboard: [] };
+    const keyboardByIndex = parsedByIndex.map(parsed => combineKeyboards(parsed.keyboard, channelButtons.keyboard));
     const publicationId = makeId();
     const publication = {
       id: publicationId,
@@ -54,8 +59,33 @@ export function registerPublications(bot, store) {
         );
       } else if (messageIds.length > 1) {
         sent = await ctx.telegram.copyMessages(channel.id, ctx.chat.id, messageIds);
+        // Copy first, then remove syntax lines from copied messages and attach the keyboard.
+        for (let i = 0; i < orderedMessages.length; i++) {
+          const parsed = parsedByIndex[i];
+          const keyboard = keyboardByIndex[i];
+          if (!parsed?.keyboard?.length && !channelButtons.keyboard.length) continue;
+          const copiedId = sent?.[i]?.message_id;
+          if (!copiedId) continue;
+          const source = orderedMessages[i];
+          const options = keyboard ? { reply_markup: keyboard } : {};
+          if (source.text) {
+            await ctx.telegram.editMessageText(channel.id, copiedId, undefined, parsed.text || ' ', options);
+          } else if (source.caption !== undefined || source.photo || source.video || source.document || source.audio || source.animation) {
+            await ctx.telegram.editMessageCaption(channel.id, copiedId, undefined, parsed.text, options);
+          }
+        }
       } else {
         sent = await ctx.telegram.copyMessage(channel.id, ctx.chat.id, messageIds[0]);
+        if (session.mode === 'free' && (parsedByIndex[0]?.keyboard?.length || channelButtons.keyboard.length)) {
+          const source = orderedMessages[0];
+          const keyboard = keyboardByIndex[0];
+          const options = keyboard ? { reply_markup: keyboard } : {};
+          if (source.text) {
+            await ctx.telegram.editMessageText(channel.id, sent.message_id, undefined, parsedByIndex[0].text || ' ', options);
+          } else if (source.caption !== undefined || source.photo || source.video || source.document || source.audio || source.animation) {
+            await ctx.telegram.editMessageCaption(channel.id, sent.message_id, undefined, parsedByIndex[0].text, options);
+          }
+        }
       }
 
       publication.status = 'published';
