@@ -62,7 +62,7 @@ function validUrl(value) {
   }
 }
 
-function parseSpecialButton(title, target, style) {
+function parseSpecialButton(title, target, style, uniqueId) {
   const text = title.trim();
   const value = target.trim();
   if (!text || !value) return null;
@@ -71,7 +71,7 @@ function parseSpecialButton(title, target, style) {
   if (/^popup:/i.test(value) || /^alert:/i.test(value)) {
     const popupText = value.replace(/^(?:popup|alert):/i, '').trim();
     if (!popupText) return null;
-    return { button: { ...button, callback_data: 'wcp:' + Buffer.from(popupText, 'utf8').toString('base64url').slice(0, 48) }, action: { type: 'popup', text: popupText } };
+    return { button: { ...button, callback_data: 'wcp:' + uniqueId }, action: { type: 'popup', text: popupText } };
   }
   if (/^rules$/i.test(value)) {
     const rulesUrl = String(process.env.WELCOME_CAPTCHA_RULES_URL || '').trim();
@@ -100,7 +100,7 @@ function parseSpecialButton(title, target, style) {
  * rules / share:text / copy:text. Use && to put multiple buttons on one row.
  * Blank lines create visual separation only; each non-empty line is a row.
  */
-export function parseWelcomeButtonSyntax(source) {
+export function parseWelcomeButtonSyntax(source, token = Math.random().toString(36).slice(2, 10)) {
   const rows = [];
   const actions = new Map();
   const lines = String(source || '').split(/\r?\n/);
@@ -120,10 +120,10 @@ export function parseWelcomeButtonSyntax(source) {
       if (splitAt <= 0) continue;
       const title = piece.slice(0, splitAt).trim();
       const target = piece.slice(splitAt + 3).trim();
-      const parsed = parseSpecialButton(title, target, style);
+      const parsed = parseSpecialButton(title, target, style, token + (++actionIndex).toString(36));
       if (!parsed) continue;
       if (parsed.action) {
-        const id = 'wcp:' + (++actionIndex).toString(36);
+        const id = parsed.button.callback_data;
         parsed.button.callback_data = id;
         actions.set(id, parsed.action);
       }
@@ -139,7 +139,7 @@ function buildKeyboard(chatId, userId, token, choices) {
     text: String(answer),
     callback_data: ['wc', chatId, userId, token, answer].join(':')
   }));
-  const custom = parseWelcomeButtonSyntax(process.env.WELCOME_CAPTCHA_BUTTONS || '');
+  const custom = parseWelcomeButtonSyntax(process.env.WELCOME_CAPTCHA_BUTTONS || '', token);
   return {
     inline_keyboard: [answerRow, ...custom.rows],
     _actions: custom.actions
