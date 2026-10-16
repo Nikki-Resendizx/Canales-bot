@@ -79,7 +79,7 @@ Título del botón - copy:Texto copiable
 - Cada línea de botones crea una fila; `&&` coloca varios botones en una sola fila.
 - `#p`, `#r` y `#g` seleccionan los estilos azul, rojo y verde de Telegram.
 - `popup:` y `alert:` abren una ventana emergente. `share:` abre el selector de compartir de Telegram. `copy:` utiliza el botón nativo de copiar texto cuando la versión de Telegram lo admite.
-- `rules` utiliza la URL configurada en `CHANNEL_RULES_URL` (también acepta `RULES_URL`). Si no está configurada, esa línea no se convierte en botón.
+- `rules` utiliza la URL configurada en `CHANNEL_RULES_URL` (también acepta `RULES_URL`). Si no está configurada, aparece como botón emergente avisando que falta configurar el enlace.
 - Los botones emergentes son temporales en memoria; tras reiniciar el bot, los botones antiguos que aún estén publicados pueden dejar de mostrar su popup.
 - Los botones de sintaxis de publicaciones gratuitas se aplican al publicar. Las publicaciones premium conservan el flujo de compra y entrega privada, sin interpretar esta sintaxis.
 
