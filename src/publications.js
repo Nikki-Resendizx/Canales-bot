@@ -22,7 +22,7 @@ export function registerPublications(bot, store) {
     const messageIds = orderedMessages.map(message => message.message_id);
     const parsedByIndex = session.mode === 'free' ? orderedMessages.map(message => parseButtonSyntax(String(message.text || message.caption || ''))) : [];
     const channelButtons = session.mode === 'free' ? parseButtonSyntax(channel.buttonsSyntax || '') : { keyboard: [] };
-    const keyboardByIndex = parsedByIndex.map(parsed => combineKeyboards(parsed.keyboard, channelButtons.keyboard));
+    const keyboardByIndex = parsedByIndex.map((parsed, index) => combineKeyboards(parsed.keyboard, index === 0 ? channelButtons.keyboard : []));
     const publicationId = makeId();
     const publication = {
       id: publicationId,
