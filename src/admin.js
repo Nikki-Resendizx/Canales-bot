@@ -482,7 +482,7 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^button:syntax:(-?\\d+)$/, async ctx => {
+  bot.action(/^button:syntax:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     setSession(ctx, { action: 'buttonsyntax', channelId: c.id });
