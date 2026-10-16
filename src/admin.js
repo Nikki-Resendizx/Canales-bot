@@ -231,7 +231,8 @@ function buttonKeyboard(c) {
     text: (b.style ? b.style.toUpperCase() + ' ' : '') + (b.icon_custom_emoji_id ? '✨ ' : '') + b.text,
     callback_data: 'button:view:' + c.id + ':' + i
   }]);
-  rows.push([{ text: '➕ AÑADIR BOTÓN', callback_data: 'button:add:' + c.id }]);
+  rows.push([{ text: '🧩 EDITAR SINTAXIS DE BOTONES', callback_data: 'button:syntax:' + c.id }]);
+  rows.push([{ text: '➕ AÑADIR BOTÓN INDIVIDUAL', callback_data: 'button:add:' + c.id }]);
   rows.push([{ text: '🧹 BORRAR TODOS', callback_data: 'button:clear:' + c.id }]);
   rows.push([{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]);
   return { reply_markup: { inline_keyboard: rows } };
@@ -1004,7 +1005,7 @@ export function registerAdmin(bot, store) {
       return ctx.reply('✅ Administrador añadido: ' + id);
     }
 
-    if (s.action === 'template') {
+    if (s.action === 'buttonsyntax') {\n      const c = ensureChannel(store, s.channelId);\n      c.buttonsSyntax = ctx.message.text.trim();\n      saveStore(store); clearSession(ctx);\n      return ctx.reply('✅ Sintaxis de botones guardada. Se aplicará a las publicaciones automáticas de este canal.');\n    }\n\n    if (s.action === 'template') {
       const c = ensureChannel(store, s.channelId);
       c.templates[s.type] = ctx.message.text.trim(); saveStore(store); clearSession(ctx);
       return ctx.reply('✅ Plantilla guardada para ' + s.type + '.');
