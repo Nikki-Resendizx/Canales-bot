@@ -233,13 +233,14 @@ async function editOne(ctx, msg, store) {
   const type = typeOf(msg);
   const renderedText = render(channel, type, msg);
   const parsedButtons = parseButtonSyntax(renderedText);
+  const channelButtons = parseButtonSyntax(channel.buttonsSyntax || '');
   const text = parsedButtons.text;
   if (channel.testMode) {
     await sendTestPreview(ctx, store, msg, type, text);
     return;
   }
 
-  const { options, mode } = editOptions(channel, msg, originalText, text, type, parsedButtons.keyboard);
+  const { options, mode } = editOptions(channel, msg, originalText, text, type, [...parsedButtons.keyboard, ...channelButtons.keyboard]);
   try {
     if ((msg.text && !text) || (!text && !options.reply_markup && !options.rich_message)) return;
     await editWithFallback(ctx, msg, text, options);
@@ -273,7 +274,7 @@ async function processAlbum(ctxs, store) {
     return;
   }
 
-  const { options, mode } = editOptions(channel, msg, originalText, text, 'album', parsedButtons.keyboard);
+  const { options, mode } = editOptions(channel, msg, originalText, text, 'album', [...parsedButtons.keyboard, ...channelButtons.keyboard]);
   try {
     if (msg.photo || msg.video || msg.audio || msg.document) {
       await editWithFallback(ctxs[0], msg, text, options);
