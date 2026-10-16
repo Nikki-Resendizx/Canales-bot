@@ -8,6 +8,7 @@ import { registerPublications } from './publications.js';
 import { registerDistribution } from './distribution.js';
 import { registerReactions } from './reactions.js';
 import { registerWelcomeCaptcha } from './welcome-captcha.js';
+import { registerSyntaxPopupActions } from './button-syntax.js';
 
 const token = String(process.env.BOT_TOKEN || '').trim();
 if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
@@ -36,6 +37,7 @@ registerPayments(bot, store);
 registerPublications(bot, store);
 registerReactions(bot, store);
 registerWelcomeCaptcha(bot, store);
+registerSyntaxPopupActions(bot);
 
 bot.command('start', (ctx) => ctx.reply(
   '🤖 CANALES-BOT\n\n' +
