@@ -149,46 +149,53 @@ function buildKeyboard(chatId, userId, token, choices) {
 export function registerWelcomeCaptcha(bot, store) {
   const customActions = new Map();
   bot.on('chat_member', async (ctx, next) => {
-    if (!enabled()) return next();
     const update = ctx.update?.chat_member;
     if (!update || !isJoining(update)) return next();
 
     const chatId = String(update.chat?.id || '');
     const user = update.new_chat_member.user;
     const userId = String(user.id);
-    if (!store.channels?.[chatId] || !configuredChannels(store).has(chatId)) return next();
+    const channel = store.channels?.[chatId];
+    if (!channel || !configuredChannels(store).has(chatId)) return next();
+    const welcomeEnabled = channel.welcomeEnabled !== false;
+    const captchaEnabled = enabled() && channel.captchaEnabled !== false;
+    if (!welcomeEnabled && !captchaEnabled) return next();
 
     pruneChallenges();
-    const challenge = makeChallenge();
+    const challenge = captchaEnabled ? makeChallenge() : null;
     const token = Math.random().toString(36).slice(2, 10);
     const key = keyFor(chatId, userId);
-    challenges.set(key, { token, answer: challenge.answer, expiresAt: Date.now() + CHALLENGE_TTL_MS, userId, chatId });
+    if (captchaEnabled) challenges.set(key, { token, answer: challenge.answer, expiresAt: Date.now() + CHALLENGE_TTL_MS, userId, chatId });
 
     const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || 'suscriptor';
-    const text = [
-      '👋 ¡Bienvenido/a, ' + name + '!',
-      '',
-      '🤖 Verifica que eres una persona para completar la confirmación.',
-      'Pulsa la respuesta correcta:',
-      '',
-      '🧩 ' + challenge.question + ' = ?',
-      '',
-      '⏳ Tienes 10 minutos.'
-    ].join('\n');
+    const replacements = {
+      nombre: name,
+      username: user.username ? '@' + user.username : '',
+      userid: userId,
+      canal: channel.title || chatId,
+      pregunta: challenge?.question || '',
+      tiempo: String(CHALLENGE_TTL_MS / 60000)
+    };
+    const replaceVariables = value => String(value || '').replace(/\{(nombre|username|userid|canal|pregunta|tiempo)\}/gi, (_, key) => replacements[key.toLowerCase()] ?? '');
+    const welcomeText = replaceVariables(channel.welcomeText || '👋 ¡Bienvenido/a, {nombre}!');
+    const captchaText = replaceVariables(channel.captchaText || '🤖 Verifica que eres una persona para completar la confirmación.\nPulsa la respuesta correcta:\n\n🧩 {pregunta} = ?\n\n⏳ Tienes {tiempo} minutos.');
+    const text = [welcomeEnabled ? welcomeText : '', captchaEnabled ? captchaText : ''].filter(Boolean).join('\n\n');
 
     try {
-      const markup = buildKeyboard(chatId, userId, token, challenge.choices);
-      for (const [id, action] of markup._actions) customActions.set(id, action);
+      const markup = captchaEnabled
+        ? buildKeyboard(chatId, userId, token, challenge.choices)
+        : { inline_keyboard: [] };
+      for (const [id, action] of markup._actions || []) customActions.set(id, action);
       delete markup._actions;
       await ctx.telegram.callApi('sendMessage', {
         chat_id: chatId,
         text,
-        reply_markup: markup,
+        ...(markup.inline_keyboard.length ? { reply_markup: markup } : {}),
         ephemeral_message_parameters: { receiver_user_id: Number(userId) }
       });
-      console.log('[WELCOME CAPTCHA] Ephemeral challenge requested:', chatId, userId);
+      console.log('[WELCOME/CAPTCHA] Ephemeral message requested:', chatId, userId, { welcomeEnabled, captchaEnabled });
     } catch (err) {
-      challenges.delete(key);
+      if (captchaEnabled) challenges.delete(key);
       console.warn('[WELCOME CAPTCHA UNSUPPORTED]', chatId, userId, err.description || err.message);
       recordAlert(store, 'welcome-captcha-unsupported',
         'Telegram rechazó o no entregó el CAPTCHA efímero para el nuevo suscriptor.',
