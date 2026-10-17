@@ -7,6 +7,10 @@ function typeOf(msg) {
   if (msg.media_group_id) return 'album';
   if (msg.forward_origin || msg.forward_from || msg.forward_from_chat || msg.forward_sender_name) return 'forwarded';
   if (msg.photo) return 'photo';
+  if (msg.video_note) return 'video_note';
+  if (msg.animation) return 'gif';
+  if (msg.audio || msg.voice) return 'audio';
+  if (msg.document) return 'document';
   if (msg.video) return 'video';
   const text = msg.text || msg.caption || '';
   return URL_RE.test(text) ? 'link' : 'text';
@@ -45,7 +49,7 @@ export function render(channel, type, msg) {
   let content = originalContent;
   if (channel.normalize) content = normalize(content);
 
-  const template = channel.templates?.[type] || '{contenido}';
+  const template = channel.templates?.[type] || channel.templates?.video || '{contenido}';
   if (/\{\s*vacio\s*\}/i.test(template)) return originalContent;
   const hashtags = (channel.hashtags || []).join(' ');
   const values = {
@@ -61,6 +65,8 @@ export function render(channel, type, msg) {
   let text = template.replace(/\{(contenido|titulo|descripcion|enlace|hashtags|fecha|canal)\}/g, (_, name) => values[name] ?? '');
   const missingHashtags = (channel.hashtags || []).filter(tag => tag && !text.includes(tag));
   if (missingHashtags.length) text += '\n\n' + missingHashtags.join(' ');
+  const signature = channel.signatureEnabled === true ? String(channel.signature || '').trim() : '';
+  if (signature && !text.includes(signature)) text += (text ? '\n\n' : '') + signature;
   return text.trim();
 }
 
@@ -176,7 +182,7 @@ async function applyEdit(ctx, msg, text, options) {
     return ctx.telegram.editMessageText(msg.chat.id, msg.message_id, undefined, text || (options.reply_markup ? ' ' : ''), options);
   }
 
-  const isMedia = msg.photo || msg.video || msg.animation || msg.audio || msg.document;
+  const isMedia = msg.photo || msg.video || msg.animation || msg.audio || msg.voice || msg.document;
   if (isMedia) {
     return ctx.telegram.editMessageCaption(msg.chat.id, msg.message_id, undefined, text || '', options);
   }
@@ -237,8 +243,8 @@ async function editOne(ctx, msg, store) {
 
   const originalText = contentOf(msg);
   const type = typeOf(msg);
-  if (isEmptyMode(channel, type)) {
-    console.log('[SKIP EMPTY MODE]', msg.chat.id, msg.message_id);
+  if (isEmptyMode(channel, type) || msg.video_note || msg.voice) {
+    console.log('[SKIP NON-EDITABLE / EMPTY MODE]', msg.chat.id, msg.message_id, type);
     return;
   }
   const renderedText = render(channel, type, msg);
