@@ -101,7 +101,9 @@ function adminMenu(ctx) {
 
 const TYPES = [
   ['text', '💬 TEXTO'], ['photo', '🖼️ FOTO'], ['video', '🎬 VIDEO'],
-  ['album', '🖼️ ÁLBUM'], ['link', '🔗 ENLACE'], ['forwarded', '↪️ REENVIADO']
+  ['album', '🗂️ ÁLBUM'], ['audio', '🎵 AUDIO'], ['gif', '🎞️ GIF'],
+  ['document', '📁 ARCHIVOS'], ['video_note', '🫧 VIDEO BURBUJA'],
+  ['link', '🔗 ENLACES'], ['forwarded', '🔄 REENVIADAS']
 ];
 
 const FORMATS = [
@@ -229,11 +231,15 @@ async function showChannels(ctx, store, edit = false) {
 }
 
 function templateKeyboard(c) {
-  return { reply_markup: { inline_keyboard: [
-    ...TYPES.map(([type, label]) => [{ text: label, callback_data: 'template:' + c.id + ':' + type }]),
-    [{ text: '📝 FORMATO', callback_data: 'format:' + c.id }],
-    [{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]
-  ]}};
+  const rows = [];
+  for (let i = 0; i < TYPES.length; i += 2) {
+    rows.push(TYPES.slice(i, i + 2).map(([type, label]) => ({ text: label, callback_data: 'template:' + c.id + ':' + type })));
+  }
+  rows.push([{ text: '✍️ FIRMA: ' + (c.signatureEnabled ? '🟢 ACTIVADA' : '🔴 DESACTIVADA'), callback_data: 'signature:toggle:' + c.id }]);
+  rows.push([{ text: '✏️ EDITAR FIRMA', callback_data: 'signature:edit:' + c.id }, { text: '👁️ VISTA PREVIA', callback_data: 'signature:preview:' + c.id }]);
+  rows.push([{ text: '📝 FORMATO', callback_data: 'format:' + c.id }]);
+  rows.push([{ text: '🔙 CANAL', callback_data: 'channel:' + c.id }]);
+  return { reply_markup: { inline_keyboard: rows }};
 }
 
 function buttonKeyboard(c) {
@@ -441,11 +447,35 @@ export function registerAdmin(bot, store) {
   bot.action(/^tpl:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
-    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nSelecciona el tipo.\n\nVariables:\n{contenido}  {titulo}  {descripcion}\n{enlace}  {hashtags}  {fecha}  {canal}\n\nSintaxis de botones en la plantilla:\nTítulo - t.me/Link\nTítulo - t.me/Uno && Título - t.me/Dos\nUna línea por fila. Colores: #p azul, #r rojo, #g verde. Especiales: popup:Texto, alert:Texto, rules, share:Texto, copy:Texto.', templateKeyboard(c));
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nSelecciona el tipo.\n\nVariables:\n{canal}  {descripcion}  {titulo}\n{enlace}  {hashtags}  {fecha}  {contenido}\n{vacio} = no editar ni añadir botones, hashtags o firma\n\nSintaxis de botones en la plantilla:\nTítulo - t.me/Link\nTítulo - t.me/Uno && Título - t.me/Dos\nUna línea por fila. Colores: #p azul, #r rojo, #g verde. Especiales: popup:Texto, alert:Texto, rules, share:Texto, copy:Texto.', templateKeyboard(c));
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^template:(-?\d+):(text|photo|video|album|link|forwarded)$/, async ctx => {
+  bot.action(/^signature:toggle:(-?\\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    c.signatureEnabled = !c.signatureEnabled;
+    saveStore(store);
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\\n\\nFirma: ' + (c.signatureEnabled ? '🟢 Activada' : '🔴 Desactivada') + '\\n\\n' + (c.signature || 'No hay firma configurada.'), templateKeyboard(c));
+    await ctx.answerCbQuery(c.signatureEnabled ? 'Firma activada' : 'Firma desactivada');
+  });
+
+  bot.action(/^signature:edit:(-?\\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    setSession(ctx, { action: 'signature', channelId: c.id });
+    await ctx.answerCbQuery();
+    return ctx.reply('✍️ EDITAR FIRMA — ' + (c.title || c.id) + '\\n\\nEnvía el texto que se añadirá al final de las publicaciones de este canal. Puedes incluir enlaces y formato compatible. Envía /cancel para cancelar.\\n\\nFirma actual:\\n' + (c.signature || '[Sin firma]'));
+  });
+
+  bot.action(/^signature:preview:(-?\\d+)$/, async ctx => {
+    if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
+    const c = ensureChannel(store, ctx.match[1]);
+    await ctx.answerCbQuery();
+    return ctx.reply('👁️ VISTA PREVIA DE FIRMA\\n\\n' + (c.signatureEnabled && c.signature ? c.signature : '[Firma vacía o desactivada]'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]] } });
+  });
+
+  bot.action(/^template:(-?\d+):(text|photo|video|video_note|gif|audio|document|album|link|forwarded)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], c = ensureChannel(store, id);
     setSession(ctx, { action: 'template', channelId: id, type });
@@ -472,7 +502,7 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^formatpick:(-?\d+):(text|photo|video|album|link|forwarded)$/, async ctx => {
+  bot.action(/^formatpick:(-?\d+):(text|photo|video|video_note|gif|audio|document|album|link|forwarded)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], c = ensureChannel(store, id);
     const rows = FORMATS.map(([value, label]) => [{
@@ -489,10 +519,10 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^formatset:(-?\d+):(text|photo|video|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
+  bot.action(/^formatset:(-?\d+):(text|photo|video|video_note|gif|audio|document|album|link|forwarded):(AUTO|HTML|Markdown|MarkdownV2|rich_message|Telegram|OFF)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const id = ctx.match[1], type = ctx.match[2], format = ctx.match[3], c = ensureChannel(store, id);
-    if (format === 'rich_message' && ['photo', 'video', 'album'].includes(type)) {
+    if (format === 'rich_message' && type !== 'text') {
       return ctx.answerCbQuery('Rich Message solo se puede aplicar a mensajes de texto.');
     }
     c.formats[type] = format;
@@ -1135,6 +1165,14 @@ export function registerAdmin(bot, store) {
       return ctx.reply(s.action === 'welcomeText' ? '✅ Bienvenida guardada para este canal.' : '✅ Mensaje del CAPTCHA guardado para este canal.', {
         reply_markup: { inline_keyboard: [[{ text: '⚙️ VOLVER AL CANAL', callback_data: 'channel:' + c.id }]] }
       });
+    }
+
+    if (s.action === 'signature') {
+      const c = ensureChannel(store, s.channelId);
+      c.signature = ctx.message.text.trim().slice(0, 1000);
+      saveStore(store);
+      clearSession(ctx);
+      return ctx.reply('✅ Firma guardada para este canal. Estado: ' + (c.signatureEnabled ? 'activada' : 'desactivada') + '.', { reply_markup: { inline_keyboard: [[{ text: '📝 VOLVER A PLANTILLAS', callback_data: 'tpl:' + c.id }]] } });
     }
 
     if (s.action === 'buttonsyntax') {
