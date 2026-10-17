@@ -36,11 +36,17 @@ function normalize(text) {
   return value;
 }
 
+export function isEmptyMode(channel, type) {
+  return /\{\s*vacio\s*\}/i.test(String(channel.templates?.[type] || ''));
+}
+
 export function render(channel, type, msg) {
-  let content = contentOf(msg);
+  const originalContent = contentOf(msg);
+  let content = originalContent;
   if (channel.normalize) content = normalize(content);
 
   const template = channel.templates?.[type] || '{contenido}';
+  if (/\{\s*vacio\s*\}/i.test(template)) return originalContent;
   const hashtags = (channel.hashtags || []).join(' ');
   const values = {
     contenido: content,
@@ -231,6 +237,10 @@ async function editOne(ctx, msg, store) {
 
   const originalText = contentOf(msg);
   const type = typeOf(msg);
+  if (isEmptyMode(channel, type)) {
+    console.log('[SKIP EMPTY MODE]', msg.chat.id, msg.message_id);
+    return;
+  }
   const renderedText = render(channel, type, msg);
   const parsedButtons = parseButtonSyntax(renderedText);
   const channelButtons = parseButtonSyntax(channel.buttonsSyntax || '');
@@ -266,6 +276,10 @@ async function processAlbum(ctxs, store) {
   if (!channel.enabled) return;
 
   const originalText = contentOf(msg);
+  if (isEmptyMode(channel, 'album')) {
+    console.log('[SKIP EMPTY MODE]', msg.chat.id, msg.message_id);
+    return;
+  }
   const renderedText = render(channel, 'album', msg);
   const parsedButtons = parseButtonSyntax(renderedText);
   const channelButtons = parseButtonSyntax(channel.buttonsSyntax || '');
