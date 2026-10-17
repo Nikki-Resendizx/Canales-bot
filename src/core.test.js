@@ -62,6 +62,30 @@ test('templates substitute content fields and append hashtags only once', () => 
   assert.equal(output.match(/#Prueba/g)?.length, 1);
 });
 
+test('{vacio} activates a no-edit mode and leaves content unchanged', () => {
+  const channel = {
+    normalize: true,
+    hashtags: ['#Automatico'],
+    buttons: [{ text: 'Botón', type: 'url', url: 'https://example.com' }],
+    templates: { text: '{vacio}' }
+  };
+  const message = { text: '  Texto original\\n\\nSin cambios  ', chat: { title: 'Canal' } };
+  assert.equal(postsModule.isEmptyMode(channel, 'text'), true);
+  assert.equal(postsModule.render(channel, 'text', message), '  Texto original\\n\\nSin cambios  ');
+});
+
+test('template variables stay in the order chosen by the administrator', () => {
+  const channel = {
+    normalize: false,
+    hashtags: [],
+    templates: { text: '{canal}\\n{descripcion}\\n{titulo}\\n{enlace}\\n{fecha}\\n{contenido}' }
+  };
+  const message = { text: 'Mi título\\nMi descripción https://example.com', chat: { title: 'Canal demo' } };
+  const output = postsModule.render(channel, 'text', message);
+  assert.match(output, /^Canal demo\\nMi descripción https:\/\\/example\\.com\\nMi título\\nhttps:\/\\/example\\.com\\n/);
+  assert.ok(output.endsWith('Mi título\\nMi descripción https://example.com'));
+});
+
 test('AUTO preserves native Telegram entities when the text is unchanged', () => {
   const channel = {
     normalize: true,
