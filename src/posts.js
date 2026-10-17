@@ -45,12 +45,13 @@ export function isEmptyMode(channel, type) {
 }
 
 export function render(channel, type, msg) {
+  const originalRaw = String(msg.text ?? msg.caption ?? '');
   const originalContent = contentOf(msg);
   let content = originalContent;
   if (channel.normalize) content = normalize(content);
 
   const template = channel.templates?.[type] || channel.templates?.video || '{contenido}';
-  if (/\{\s*vacio\s*\}/i.test(template)) return originalContent;
+  if (/\{\s*vacio\s*\}/i.test(template)) return originalRaw;
   const hashtags = (channel.hashtags || []).join(' ');
   const values = {
     contenido: content,
