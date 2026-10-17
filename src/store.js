@@ -6,6 +6,10 @@ const DEFAULT = {
   text: '{contenido}',
   photo: '{contenido}',
   video: '{contenido}',
+  video_note: '{vacio}',
+  gif: '{contenido}',
+  audio: '{contenido}',
+  document: '{contenido}',
   album: '{contenido}',
   link: '{contenido}',
   forwarded: '{contenido}'
@@ -50,6 +54,8 @@ function normalizeChannel(channel, global) {
   channel.formats = { ...(global.formats || {}), ...(channel.formats || {}) };
   for (const type of Object.keys(DEFAULT)) if (!['AUTO', 'HTML', 'Markdown', 'MarkdownV2', 'rich_message', 'Telegram', 'OFF'].includes(channel.formats[type])) channel.formats[type] = legacy || 'AUTO';
   channel.normalize = channel.normalize !== false;
+  channel.signature = typeof channel.signature === 'string' ? channel.signature : '';
+  channel.signatureEnabled = channel.signatureEnabled === true;
   channel.testMode = channel.testMode === true;
   if (typeof channel.welcomeEnabled !== 'boolean') channel.welcomeEnabled = true;
   if (typeof channel.captchaEnabled !== 'boolean') channel.captchaEnabled = true;
@@ -147,6 +153,8 @@ export function ensureChannel(store, id, title = '') {
       welcomeText: '👋 ¡Bienvenido/a, {nombre}!',
       captchaText: '🤖 Verifica que eres una persona para completar la confirmación.\\nPulsa la respuesta correcta:\\n\\n🧩 {pregunta} = ?\\n\\n⏳ Tienes {tiempo} minutos.',
       templates: { ...store.global.templates },
+      signature: '',
+      signatureEnabled: false,
       hashtags: [],
       buttons: [],
       formats: { ...store.global.formats },
