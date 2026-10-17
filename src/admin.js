@@ -451,28 +451,28 @@ export function registerAdmin(bot, store) {
     await ctx.answerCbQuery();
   });
 
-  bot.action(/^signature:toggle:(-?\\d+)$/, async ctx => {
+  bot.action(/^signature:toggle:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     c.signatureEnabled = !c.signatureEnabled;
     saveStore(store);
-    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\\n\\nFirma: ' + (c.signatureEnabled ? '🟢 Activada' : '🔴 Desactivada') + '\\n\\n' + (c.signature || 'No hay firma configurada.'), templateKeyboard(c));
+    await ctx.editMessageText('📝 PLANTILLAS — ' + (c.title || c.id) + '\n\nFirma: ' + (c.signatureEnabled ? '🟢 Activada' : '🔴 Desactivada') + '\n\n' + (c.signature || 'No hay firma configurada.'), templateKeyboard(c));
     await ctx.answerCbQuery(c.signatureEnabled ? 'Firma activada' : 'Firma desactivada');
   });
 
-  bot.action(/^signature:edit:(-?\\d+)$/, async ctx => {
+  bot.action(/^signature:edit:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     setSession(ctx, { action: 'signature', channelId: c.id });
     await ctx.answerCbQuery();
-    return ctx.reply('✍️ EDITAR FIRMA — ' + (c.title || c.id) + '\\n\\nEnvía el texto que se añadirá al final de las publicaciones de este canal. Puedes incluir enlaces y formato compatible. Envía /cancel para cancelar.\\n\\nFirma actual:\\n' + (c.signature || '[Sin firma]'));
+    return ctx.reply('✍️ EDITAR FIRMA — ' + (c.title || c.id) + '\n\nEnvía el texto que se añadirá al final de las publicaciones de este canal. Puedes incluir enlaces y formato compatible. Envía /cancel para cancelar.\n\nFirma actual:\n' + (c.signature || '[Sin firma]'));
   });
 
-  bot.action(/^signature:preview:(-?\\d+)$/, async ctx => {
+  bot.action(/^signature:preview:(-?\d+)$/, async ctx => {
     if (!allowed(ctx)) return ctx.answerCbQuery('Sin permiso');
     const c = ensureChannel(store, ctx.match[1]);
     await ctx.answerCbQuery();
-    return ctx.reply('👁️ VISTA PREVIA DE FIRMA\\n\\n' + (c.signatureEnabled && c.signature ? c.signature : '[Firma vacía o desactivada]'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]] } });
+    return ctx.reply('👁️ VISTA PREVIA DE FIRMA\n\n' + (c.signatureEnabled && c.signature ? c.signature : '[Firma vacía o desactivada]'), { reply_markup: { inline_keyboard: [[{ text: '🔙 PLANTILLAS', callback_data: 'tpl:' + c.id }]] } });
   });
 
   bot.action(/^template:(-?\d+):(text|photo|video|video_note|gif|audio|document|album|link|forwarded)$/, async ctx => {
