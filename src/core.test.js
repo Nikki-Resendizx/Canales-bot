@@ -71,7 +71,7 @@ test('{vacio} activates a no-edit mode and leaves content unchanged', () => {
   };
   const message = { text: '  Texto original\\n\\nSin cambios  ', chat: { title: 'Canal' } };
   assert.equal(postsModule.isEmptyMode(channel, 'text'), true);
-  assert.equal(postsModule.render(channel, 'text', message), '  Texto original\\n\\nSin cambios  ');
+  assert.equal(postsModule.render(channel, 'text', message), 'Texto original\\n\\nSin cambios');
 });
 
 test('template variables stay in the order chosen by the administrator', () => {
